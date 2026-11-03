@@ -93,7 +93,7 @@ in this build. The privacy manifest declares UserDefaults (`CA92.1`) and no trac
 Verified: both platforms build in Debug and Release; `tools/archive.sh ios` and `tools/archive.sh mac` both produce a
 real archive and a local App Store export (`Swift Zero to Hero.ipa` and `Swift Zero to Hero.pkg`), signed with an Apple
 Distribution profile, production iCloud and `get-task-allow` false; the on-device engine passes 61 exercise solutions;
-the app runs end to end on iPhone and iPad simulators; the Mac app launches signed; the kit has 12 tests.
+the app runs end to end on iPhone and iPad simulators; the Mac app launches signed; the kit has 24 tests.
 
 iCloud is verified on one signed **Development** Mac build: the CloudKit container opened, the app mirrored records to
 `iCloud.technology.asteria.zerotohero`, and Settings reads "Progress is in your iCloud". The distribution pkg carries

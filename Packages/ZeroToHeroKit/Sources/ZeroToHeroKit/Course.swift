@@ -31,7 +31,8 @@ public nonisolated struct Course: Decodable, Sendable {
         return (i > 0 ? all[i - 1] : nil, i + 1 < all.count ? all[i + 1] : nil)
     }
 
-    /// The next lesson that is not done, in course order, starting after `id`.
+    /// The next lesson that is not done, in course order. When `id` itself is unfinished it is returned first, which is
+    /// what Continue should do; when it is done, the search starts with the lesson after it.
     public func next(after id: Lesson.ID?, done: (Lesson.ID) -> Bool) -> Lesson? {
         let all = lessons
         let start = id.flatMap { wanted in all.firstIndex { $0.id == wanted } } ?? 0

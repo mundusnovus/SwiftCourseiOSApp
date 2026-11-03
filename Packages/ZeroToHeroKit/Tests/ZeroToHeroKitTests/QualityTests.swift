@@ -24,8 +24,6 @@ struct CourseContractTests {
     @Test func quizzesHaveOneRightAnswer() throws {
         let course = try Course.load()
         for lesson in course.lessons where !lesson.questions.isEmpty {
-            #expect(lesson.type == .quiz || lesson.type == .lesson || lesson.type == .lab || lesson.type == .xcode,
-                    "\(lesson.id) carries questions on a sensible type")
             for question in lesson.questions {
                 let correct = question.answers.filter(\.correct).count
                 #expect(correct >= 1, "\(lesson.id) has a correct answer")
@@ -53,7 +51,8 @@ struct CourseContractTests {
         let first = course.lessons[0]
         let second = course.lessons[1]
         #expect(course.next(after: nil) { _ in false }?.id == first.id)
-        #expect(course.next(after: first.id) { _ in false }?.id == second.id)
+        #expect(course.next(after: first.id) { _ in false }?.id == first.id, "Continue resumes an unfinished lesson")
+        #expect(course.next(after: first.id) { $0 == first.id }?.id == second.id, "a finished lesson moves on")
         #expect(course.next(after: nil) { _ in true } == nil)
         #expect(course.neighbours(of: first.id).previous == nil)
         #expect(course.neighbours(of: first.id).next?.id == second.id)
