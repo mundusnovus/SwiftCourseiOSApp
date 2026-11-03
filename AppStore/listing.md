@@ -62,14 +62,16 @@ swiftdata, icloud
 
 ## Screenshots in this folder
 
-| File | Screen |
-| --- | --- |
-| `1-home.png` | Course home, progress, today |
-| `2-exercise.png` | A passing exercise with the console |
-| `3-modern-apple.png` | A Foundation Models lesson |
-| `4-milestones.png` | Milestones, earned and locked |
-| `5-xcode-lab.png` | An Xcode lab lesson |
-| `6-mac.png` | The Mac app |
+| File | Size | Screen |
+| --- | --- | --- |
+| `6.9-1-home.png` | 1320×2868 | Course home, progress, today |
+| `6.9-2-exercise.png` | 1320×2868 | A passing exercise with the console |
+| `6.9-3-milestones.png` | 1320×2868 | Milestones, earned and locked |
+| `ipad-1-home.png` | 2064×2752 | iPad Pro 13-inch home |
+| `7-classes.png` | 1206×2622 | A class exercise, reference semantics |
+| `3-modern-apple.png` | 1206×2622 | A Foundation Models lesson |
+| `5-xcode-lab.png` | 1206×2622 | An Xcode lab lesson |
+| `6-mac.png` | desktop | The Mac app |
 
-The captures are 1206×2622 (iPhone 17). App Store Connect's 6.9-inch slot needs 1320×2868; recapture on an iPhone 17
-Pro Max before upload, and add 13-inch iPad and 2880×1800 Mac shots.
+The 6.9-inch iPhone and 13-inch iPad captures are at App Store Connect's required sizes. The Mac shot still needs a
+clean 2880×1800 capture without other windows behind it.

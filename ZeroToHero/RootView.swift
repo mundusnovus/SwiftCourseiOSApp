@@ -47,14 +47,7 @@ struct RootView: View {
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        #if os(iOS)
-        ToolbarItem(placement: .topBarLeading) {
-            Button("Lessons", systemImage: "list.bullet") {
-                withAnimation { compactColumn = compactColumn == .detail ? .sidebar : .detail }
-            }
-            .accessibilityLabel("Lessons")
-        }
-        #endif
+        #if os(macOS)
         ToolbarItemGroup(placement: .navigation) {
             Button("Previous lesson", systemImage: "chevron.left") { model.go(by: -1) }
                 .disabled(model.selectedLesson.flatMap { model.course.neighbours(of: $0.id).previous } == nil)
@@ -63,6 +56,7 @@ struct RootView: View {
                 .disabled(model.nextLesson == nil)
                 .accessibilityLabel("Next lesson")
         }
+        #endif
         #if os(iOS)
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button("Make a lesson", systemImage: "apple.intelligence") { model.showStudy = true }
@@ -333,29 +327,58 @@ struct HomeView: View {
     private var todayCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("TODAY").font(.reading(.caption2, weight: .bold)).tracking(1).foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                if let next = model.nextLesson {
-                    todayRow(icon: "play.fill", tint: Palette.sea, title: "Next lesson", detail: next.title) { model.open(next) }
+            if compact {
+                VStack(spacing: 8) {
+                    if let next = model.nextLesson {
+                        todayRow(icon: "play.fill", tint: Palette.sea, title: "Next lesson", detail: next.title, horizontal: true) { model.open(next) }
+                    }
+                    todayRow(icon: "trophy.fill", tint: Palette.gold, title: "Milestones", detail: "\(model.store.badges.count) earned", horizontal: true) {
+                        model.showAchievements = true
+                    }
+                    todayRow(icon: "flame.fill", tint: Palette.alert, title: "Streak", detail: "\(model.store.streak) days", horizontal: true) {
+                        model.showAchievements = true
+                    }
                 }
-                todayRow(icon: "trophy.fill", tint: Palette.gold, title: "Milestones", detail: "\(model.store.badges.count) earned") {
-                    model.showAchievements = true
-                }
-                todayRow(icon: "flame.fill", tint: Palette.alert, title: "Streak", detail: "\(model.store.streak) days") {
-                    model.showAchievements = true
+            } else {
+                HStack(spacing: 12) {
+                    if let next = model.nextLesson {
+                        todayRow(icon: "play.fill", tint: Palette.sea, title: "Next lesson", detail: next.title) { model.open(next) }
+                    }
+                    todayRow(icon: "trophy.fill", tint: Palette.gold, title: "Milestones", detail: "\(model.store.badges.count) earned") {
+                        model.showAchievements = true
+                    }
+                    todayRow(icon: "flame.fill", tint: Palette.alert, title: "Streak", detail: "\(model.store.streak) days") {
+                        model.showAchievements = true
+                    }
                 }
             }
         }
     }
 
-    private func todayRow(icon: String, tint: Color, title: String, detail: String, action: @escaping () -> Void) -> some View {
+    private func todayRow(icon: String, tint: Color, title: String, detail: String,
+                          horizontal: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: icon).symbol().font(.title3).foregroundStyle(tint)
-                Text(title).font(.reading(.caption, weight: .semibold)).foregroundStyle(.secondary)
-                Text(detail).font(.reading(.callout, weight: .medium)).lineLimit(2).multilineTextAlignment(.leading)
+            Group {
+                if horizontal {
+                    HStack(spacing: 12) {
+                        Image(systemName: icon).symbol().font(.title3).foregroundStyle(tint).frame(width: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(title).font(.reading(.caption, weight: .semibold)).foregroundStyle(.secondary)
+                            Text(detail).font(.reading(.callout, weight: .medium)).lineLimit(1)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Image(systemName: icon).symbol().font(.title3).foregroundStyle(tint)
+                        Text(title).font(.reading(.caption, weight: .semibold)).foregroundStyle(.secondary)
+                        Text(detail).font(.reading(.callout, weight: .medium)).lineLimit(2).multilineTextAlignment(.leading)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+            .padding(horizontal ? 12 : 14)
             .background(.background.opacity(0.7), in: .rect(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.quaternary))
         }
