@@ -59,7 +59,7 @@ struct AchievementsView: View {
                     .presentationDetents([.medium, .large])
             }
         }
-        .tint((AccentChoice(rawValue: accentRaw) ?? .sea).color)
+        .appTint()
     }
 
     private var summary: some View {
@@ -138,6 +138,7 @@ struct BadgeDetail: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
+            .appTint()
         }
     }
 

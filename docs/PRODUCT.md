@@ -51,6 +51,10 @@ At the bar: both platforms archive and export locally with an Apple Distribution
 `get-task-allow` false; the iPhone 6.9-inch, iPad 13-inch and Mac screenshots are at the required sizes; the listing
 and review notes are written.
 
+iCloud is verified on one signed Mac: the container opened, mirroring wrote records, and Settings says "Progress is in
+your iCloud". Apple Intelligence is verified on the same Mac: a generated "Closures Made Simple" lesson appeared from
+the on-device model. Two-device sync and Siri/Spotlight on hardware are still outstanding.
+
 Not yet at the bar: a signed install on a physical device, iCloud sync between two devices, Siri phrases and Spotlight
 results on hardware, PCC (entitlement), upload to App Store Connect, VoiceOver and Dynamic Type on hardware. These are
 listed in every report until they are done.

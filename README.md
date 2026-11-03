@@ -40,6 +40,14 @@ tools/screenshots-ios.sh
 
 Open `ZeroToHero.xcodeproj`, scheme **ZeroToHero**, destination My Mac or an iPhone simulator.
 
+iCloud schema on a signed Mac (once, then deploy to Production in CloudKit Console):
+
+```sh
+# Debug build signed with the Development profile
+open "/path/to/Swift Zero to Hero.app" --args -allowCloudKit -initCloudKitSchema
+```
+
+
 ## Layout
 
 | Path | What it is |
@@ -85,6 +93,11 @@ Verified: both platforms build in Debug and Release; `tools/archive.sh ios` and 
 real archive and a local App Store export (`Swift Zero to Hero.ipa` and `Swift Zero to Hero.pkg`), signed with an Apple
 Distribution profile, production iCloud and `get-task-allow` false; the on-device engine passes 61 exercise solutions;
 the app runs end to end on iPhone and iPad simulators; the Mac app launches signed; the kit has 12 tests.
+
+iCloud is verified on one signed Mac: the CloudKit container opened, the app mirrored records to
+`iCloud.technology.asteria.zerotohero`, and Settings reads "Progress is in your iCloud". Apple Intelligence is verified
+on the same Mac: the mini-lesson generator produced a "Closures Made Simple" lesson on device. Two-device iCloud sync
+and Siri/Spotlight on hardware are not yet verified.
 
 Not verified: upload to App Store Connect (yours to do), iCloud sync between two signed devices, Siri phrases and
 Spotlight results on hardware, Private Cloud Compute (entitlement not granted), VoiceOver and Dynamic Type on hardware.

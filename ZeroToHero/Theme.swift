@@ -126,6 +126,19 @@ struct Wordmark: View {
     }
 }
 
+/// Applies the person's chosen accent to a sheet or window that would otherwise use the system accent.
+struct AppTint: ViewModifier {
+    @AppStorage("accent") private var accentRaw = AccentChoice.sea.rawValue
+
+    func body(content: Content) -> some View {
+        content.tint((AccentChoice(rawValue: accentRaw) ?? .sea).color)
+    }
+}
+
+extension View {
+    func appTint() -> some View { modifier(AppTint()) }
+}
+
 /// A frosted card for grouped content that floats over the page. Not for every row.
 struct GlassCard<Content: View>: View {
     var tint: Color?

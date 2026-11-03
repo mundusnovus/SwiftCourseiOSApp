@@ -41,6 +41,7 @@ struct ZeroToHeroApp: App {
             SettingsView()
                 .environment(model)
                 .modelContainer(store.container)
+                .appTint()
         }
         #endif
     }

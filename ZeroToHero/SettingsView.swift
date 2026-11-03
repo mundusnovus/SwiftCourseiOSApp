@@ -18,7 +18,7 @@ struct SettingsView: View {
         Form { panes }
             .formStyle(.grouped)
             .frame(width: 540, height: 620)
-            .tint(choice.color)
+            .appTint()
         #else
         NavigationStack {
             Form { panes }

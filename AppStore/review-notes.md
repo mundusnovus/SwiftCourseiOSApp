@@ -49,7 +49,8 @@ tracked data. Progress and code are the person's own, in their private iCloud if
 
 - 61 of 83 exercises are checked fully on device; the rest are explicit Xcode labs. Nothing is silently marked wrong.
 - Private Cloud Compute is off until Apple grants the entitlement.
-- iCloud sync is not verified on two devices in this build.
+- iCloud is verified on one signed Mac; two-device sync is not verified in this build.
+- Apple Intelligence is verified on the Mac; Siri phrases and Spotlight results still need a physical device check.
 
 ## Contact
 

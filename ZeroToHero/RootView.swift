@@ -28,9 +28,9 @@ struct RootView: View {
         .tint(accent)
         .overlay(alignment: .bottom) { NoticeView() }
         .animation(.spring(duration: 0.35), value: model.notice)
-        .sheet(isPresented: $model.showSettings) { SettingsView() }
-        .sheet(isPresented: $model.showAchievements) { AchievementsView() }
-        .sheet(isPresented: $model.showStudy) { StudySheet() }
+        .sheet(isPresented: $model.showSettings) { SettingsView().tint(accent) }
+        .sheet(isPresented: $model.showAchievements) { AchievementsView().tint(accent) }
+        .sheet(isPresented: $model.showStudy) { StudySheet().tint(accent) }
         .onChange(of: model.selection) { _, _ in compactColumn = .detail }
         .onContinueUserActivity("technology.asteria.zerotohero.lesson") { activity in
             if let id = activity.userInfo?["lesson"] as? String, let lesson = model.course.lesson(id) {

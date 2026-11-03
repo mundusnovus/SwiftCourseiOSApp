@@ -256,6 +256,7 @@ struct CodeCoachSheet: View {
                 .frame(maxWidth: .infinity)
             }
             .navigationTitle("Code coach")
+            .appTint()
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -339,6 +340,7 @@ struct LessonReviewSheet: View {
                 .frame(maxWidth: .infinity)
             }
             .navigationTitle("Review")
+            .appTint()
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -407,10 +409,19 @@ struct StudySheet: View {
                 .frame(maxWidth: .infinity)
             }
             .navigationTitle("Make a lesson")
+            .appTint()
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task {
+                #if DEBUG
+                if Demo.arguments.contains("-ai-demo"), topic.isEmpty {
+                    topic = "closures"
+                    generate()
+                }
+                #endif
+            }
         }
     }
 

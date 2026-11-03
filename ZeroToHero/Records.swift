@@ -64,10 +64,28 @@ enum Records {
         do {
             let config = ModelConfiguration(schema: schema, cloudKitDatabase: .private(cloudContainer))
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-initCloudKitSchema") { try initializeCloudKitSchema(at: config.url) }
+            if ProcessInfo.processInfo.arguments.contains("-initCloudKitSchema") {
+                do {
+                    try initializeCloudKitSchema(at: config.url)
+                    #if DEBUG
+                    print("ZTH CloudKit: schema initialized in Development")
+                    #endif
+                } catch {
+                    #if DEBUG
+                    print("ZTH CloudKit: schema initialization failed: \(error)")
+                    #endif
+                }
+            }
             #endif
-            return (try ModelContainer(for: schema, configurations: config), true)
+            let container = try ModelContainer(for: schema, configurations: config)
+            #if DEBUG
+            print("ZTH CloudKit: container opened in iCloud")
+            #endif
+            return (container, true)
         } catch {
+            #if DEBUG
+            print("ZTH CloudKit: container failed, staying local: \(error)")
+            #endif
             return (local(), false)
         }
     }
@@ -78,7 +96,9 @@ enum Records {
         #if targetEnvironment(simulator)
         return false
         #elseif os(macOS) && DEBUG
-        return false
+        // A signed Debug Mac run can opt in for the one-time CloudKit schema initialisation. Unsigned builds never do.
+        return ProcessInfo.processInfo.arguments.contains("-allowCloudKit")
+            && (Bundle.main.object(forInfoDictionaryKey: "AsteriaCloudKit") as? String) != "NO"
         #else
         return (Bundle.main.object(forInfoDictionaryKey: "AsteriaCloudKit") as? String) != "NO"
         #endif

@@ -168,7 +168,7 @@ struct ReadingLessonView: View {
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .sheet(isPresented: $showReview) { LessonReviewSheet(lesson: lesson) }
+        .sheet(isPresented: $showReview) { LessonReviewSheet(lesson: lesson).appTint() }
     }
 }
 
@@ -425,7 +425,7 @@ struct CodeLessonView: View {
             }
             #endif
         }
-        .sheet(isPresented: $showCoach) { CodeCoachSheet(lesson: lesson, code: code, result: result) }
+        .sheet(isPresented: $showCoach) { CodeCoachSheet(lesson: lesson, code: code, result: result).appTint() }
         .onChange(of: code) { _, new in model.store.setCode(new, for: lesson.id) }
         #if os(macOS)
         .focusedSceneValue(\.runAction, RunAction(run: run))
