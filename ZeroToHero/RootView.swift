@@ -59,8 +59,13 @@ struct RootView: View {
 
     /// A badge was earned: celebrate it once, with a way to share it, unless another sheet is already up.
     private var newMilestones: Binding<Bool> {
-        Binding(get: { !model.store.lastEarned.isEmpty && !model.showAchievements && !model.showSettings },
-                set: { if !$0 { model.store.clearNewBadges() } })
+        Binding(get: {
+            #if DEBUG
+            // Screenshot and demo runs ask for a clean exercise screen instead of the celebration.
+            if Demo.arguments.contains("-nobadges") { return false }
+            #endif
+            return !model.store.lastEarned.isEmpty && !model.showAchievements && !model.showSettings
+        }, set: { if !$0 { model.store.clearNewBadges() } })
     }
 
     private var intelligenceMenu: some View {
@@ -472,47 +477,50 @@ struct HomeView: View {
         }
         .contentShape(.rect) }
         .buttonStyle(.plain)
-        .accessibilityHint(done == chapter.lessons.count ? "Opens the chapter" : "Continues the chapter")
+        .accessibilityHint(done == chapter.lessons.count ? "Opens the first lesson" : "Continues the chapter")
     }
 
-    /// Today's slice of the week plan, so the plan is one glance away, not one menu away.
-    private var weekCard: some View {
+    /// Today's slice of the week plan, so the plan is one glance away, not one menu away. Hidden when there is
+    /// nothing left to plan, so a finished course does not show an empty card.
+    @ViewBuilder private var weekCard: some View {
         let plan = model.plan(minutesPerDay: minutesPerDay)
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("THIS WEEK").font(.reading(.caption2, weight: .bold)).tracking(1).foregroundStyle(.secondary)
-                Spacer()
-                Button("See the week") { model.showPlan = true }.font(.reading(.caption, weight: .semibold))
-            }
-            if let today = plan.days.first {
-                ForEach(today.lessons.prefix(3)) { lesson in
-                    Button { model.open(lesson) } label: {
+        if !plan.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("THIS WEEK").font(.reading(.caption2, weight: .bold)).tracking(1).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("See the week") { model.showPlan = true }.font(.reading(.caption, weight: .semibold))
+                }
+                if let today = plan.days.first {
+                    ForEach(today.lessons.prefix(3)) { lesson in
+                        Button { model.open(lesson) } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: lesson.type.symbol).symbol().foregroundStyle(Palette.seaText).frame(width: 22)
+                                Text(lesson.title).font(.reading(.callout)).lineLimit(1)
+                                Spacer()
+                                Text("\(lesson.minutes) min").font(.reading(.caption)).monospacedDigit().foregroundStyle(.secondary)
+                            }
+                            .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                if let review = plan.review.first {
+                    Button { model.open(review) } label: {
                         HStack(spacing: 10) {
-                            Image(systemName: lesson.type.symbol).symbol().foregroundStyle(Palette.seaText).frame(width: 22)
-                            Text(lesson.title).font(.reading(.callout)).lineLimit(1)
+                            Image(systemName: "arrow.counterclockwise").symbol().foregroundStyle(Palette.emphasis).frame(width: 22)
+                            Text("Review: \(review.title)").font(.reading(.callout)).lineLimit(1)
                             Spacer()
-                            Text("\(lesson.minutes) min").font(.reading(.caption)).monospacedDigit().foregroundStyle(.secondary)
                         }
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                 }
             }
-            if let review = plan.review.first {
-                Button { model.open(review) } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "arrow.counterclockwise").symbol().foregroundStyle(Palette.emphasis).frame(width: 22)
-                        Text("Review: \(review.title)").font(.reading(.callout)).lineLimit(1)
-                        Spacer()
-                    }
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-            }
+            .padding(16)
+            .background(.background.opacity(0.7), in: .rect(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.quaternary))
         }
-        .padding(16)
-        .background(.background.opacity(0.7), in: .rect(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.quaternary))
     }
 }
 

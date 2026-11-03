@@ -18,6 +18,9 @@ grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 27.0;' ZeroToHero.xcodeproj/project.pbxpro
 grep -q 'MACOSX_DEPLOYMENT_TARGET = 27.0;' ZeroToHero.xcodeproj/project.pbxproj || fail "macOS 27"
 [ -d Packages/ZeroToHeroKit ] || fail "kit package missing"
 ! grep -Rq 'executableTarget' Packages/ZeroToHeroKit/Package.swift || fail "no executable target next to the app"
+file_version="$(tr -d '[:space:]' < VERSION)"
+project_version="$(grep -m1 'MARKETING_VERSION = ' ZeroToHero.xcodeproj/project.pbxproj | sed 's/.*= //;s/;//')"
+[ "$file_version" = "$project_version" ] || fail "VERSION ($file_version) differs from MARKETING_VERSION ($project_version)"
 
 echo "3. Serverless"
 # Web links (privacy, license) are fine; a network call is not. Apple's own services go through their frameworks.
@@ -43,7 +46,8 @@ for ch in c["chapters"]:
             assert l["description"], l["id"]
             if l["questions"]:
                 assert any(a["correct"] for q in l["questions"] for a in q["answers"]), l["id"]
-print(f"   {len(c['chapters'])} chapters, {len(ids)} lessons, {sum(1 for l in c['lessons'] if l['tests']) if False else sum(1 for ch in c['chapters'] for m in ch['modules'] for l in m['lessons'] if l['tests'])} exercises")
+print(f"   {len(c['chapters'])} chapters, {len(ids)} lessons, "
+      f"{sum(1 for ch in c['chapters'] for m in ch['modules'] for l in m['lessons'] if l['tests'])} exercises")
 PY
 [ -f ZeroToHero/Resources/course.json ] || fail "course not in the app"
 cmp -s Resources/course.json ZeroToHero/Resources/course.json || fail "app course differs from the reviewed course"
@@ -58,7 +62,23 @@ xcodebuild -project ZeroToHero.xcodeproj -scheme ZeroToHero -configuration Debug
 
 echo "7. Schemes"
 xcodebuild -list -project ZeroToHero.xcodeproj 2>/dev/null | awk '/Schemes:/{flag=1;next} flag && NF{print}' | while read -r scheme; do
-    [ "$scheme" = "ZeroToHero" ] || warn "extra scheme: $scheme (archive with ZeroToHero)"
+    case "$scheme" in
+        ZeroToHero|ZeroToHeroKit) ;; # the app scheme, plus the package's automatic test scheme
+        *) warn "extra scheme: $scheme (archive with ZeroToHero)" ;;
+    esac
 done
+
+echo "8. Screenshots"
+check_shot() { # path, width, height
+    local path="$1" width="$2" height="$3" actual
+    [ -f "$path" ] || fail "missing screenshot $path"
+    actual="$(sips -g pixelWidth -g pixelHeight "$path" 2>/dev/null | awk '/pixelWidth/{w=$2}/pixelHeight/{print w"x"$2}')"
+    [ "$actual" = "${width}x${height}" ] || fail "$path is $actual; App Store Connect wants ${width}x${height}"
+}
+check_shot AppStore/screenshots/6.9-1-home.png 1320 2868
+check_shot AppStore/screenshots/6.9-2-exercise.png 1320 2868
+check_shot AppStore/screenshots/6.9-3-milestones.png 1320 2868
+check_shot AppStore/screenshots/ipad-1-home.png 2064 2752
+check_shot AppStore/screenshots/mac-2880.png 2880 1800
 
 echo "OK. Not checked here: signing, device install, iCloud sync, Siri phrases, PCC."

@@ -30,29 +30,32 @@ Version 2.0 of Swift: Zero to Hero for Mac and iOS, from the owner's seven point
 - Serverless exercise engine: parser + interpreter + the lesson's tests. Mac compiler when available, same engine as
   the fallback.
 - SwiftData + CloudKit private database for progress, code, ticks, streaks and badges. Local fallback, 1.0 import.
-- Apple Intelligence: code coach, recap, mini-lesson, study plan. On device; PCC gated.
+- Apple Intelligence: code coach, code review, recap, mini-lesson with a scratch editor, and a weekly study plan built
+  from progress. On device; PCC gated.
 - App Intents, App Shortcuts, Spotlight, Handoff.
-- 24 achievements, pure rules, 1080×1350 share card.
-- 173 lessons, 10 chapters, 83 exercises, 82 quizzes. 61 exercises checked on device; the rest are explicit Xcode
+- 24 achievements, pure rules, 1080×1350 share card, and a new-milestone celebration.
+- 173 lessons, 10 chapters, 83 exercises, 82 quizzes. 61 exercises checked on device; the other 22 are explicit Xcode
   labs with the tests and starting code shown.
 
 ## The acceptance bar
 
 - Both platforms build with no errors.
-- `tools/check.sh` passes.
+- `tools/check.sh` passes, including 31 Swift Testing tests in 10 suites.
 - A lesson runs end to end on an iPhone simulator with no network.
 - The Mac app launches and opens a lesson.
 - No endpoint, install id or `RemoteRunner` remains.
 - The app bundle contains the course, the font and the device-support list, not the solutions.
 - Every lesson has a title and description; every quiz has one correct answer; ids are unique.
 - Settings tells the truth about iCloud and Apple Intelligence.
+- The shipped `device-support.json` matches the coverage audit; no correct answer is silently marked wrong.
 
 At the bar: both platforms archive and export locally with an Apple Distribution profile, production iCloud and
 `get-task-allow` false; the iPhone 6.9-inch, iPad 13-inch and Mac screenshots are at the required sizes; the listing
 and review notes are written.
 
 iCloud is verified on one signed Development Mac build: the container opened, mirroring wrote records, and Settings says
-"Progress is in your iCloud". The distribution pkg carries the Production entitlement and is installed via the App
+"Progress is in your iCloud". The Development schema is also deployed to Production; both environments show the four
+SwiftData record types and `Users`. The distribution pkg carries the Production entitlement and is installed via the App
 Store/TestFlight; it is not expected to launch from a copied payload. Apple Intelligence is verified on the same Mac.
 Two-device sync and Siri/Spotlight on hardware are still outstanding.
 
@@ -71,7 +74,8 @@ listed in every report until they are done.
 ## Next
 
 1. Raise device coverage from 61 to the last 22: extensions, tuples, Codable, async streams and the enum/associated-value cases.
-2. Test iCloud on two signed devices; run `-initCloudKitSchema` and deploy the schema.
+2. Test iCloud on two signed devices. The Development schema is created and deployed to Production; verify the records
+   arrive on both devices.
 3. Speak every App Shortcut phrase on a device; check Spotlight results. Spotlight indexed all 173 lessons on the iOS
    simulator. CoreSpotlight donation fails in the sandboxed Mac build with `CSIndexErrorDomain -1000` / 4099, matching
    radar 37340318; iOS hardware is the final check.

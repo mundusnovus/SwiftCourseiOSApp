@@ -66,7 +66,8 @@ struct LessonHeader: View {
         VStack(alignment: .leading, spacing: 9) {
             if let place = model.course.module(of: lesson.id) {
                 Text("\(place.chapter.title)  ›  \(place.module.title)")
-                    .font(.reading(.caption)).foregroundStyle(.secondary).lineLimit(1)
+                    .font(.reading(.caption)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 KindBadge(kind: lesson.type)

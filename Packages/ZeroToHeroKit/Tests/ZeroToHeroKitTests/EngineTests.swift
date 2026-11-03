@@ -72,7 +72,8 @@ struct EngineTests {
 }
 
 /// How much of the shipped course the on-device engine can check. This is the audit the plan promised: it prints a
-/// coverage report and fails only if it finds no coverage at all, so it can be run on every change without hiding gaps.
+/// coverage report, and it also checks that the list shipped in the app matches this run, so an engine change cannot
+/// quietly leave a lesson marked as runnable when it is not (or vice versa).
 @Suite("Course coverage")
 struct CoverageTests {
     @Test func measure() async throws {
@@ -86,7 +87,7 @@ struct CoverageTests {
         let runner = OnDeviceRunner()
         var runnable: [String] = []
         var labs: [String] = []
-        var broken: [(String, String)] = []
+        var beyond: [(String, String)] = []
         for lesson in course.lessons where lesson.hasCode {
             guard let solution = solutions[lesson.id] else { continue }
             print("CHECK \(lesson.id)")
@@ -97,17 +98,30 @@ struct CoverageTests {
             } else if result.passed {
                 runnable.append(lesson.id)
             } else {
-                broken.append((lesson.id, result.tests.filter { !$0.passed }.map(\.text).joined(separator: " | ")))
+                beyond.append((lesson.id, result.tests.filter { !$0.passed }.map(\.text).joined(separator: " | ")))
             }
         }
-        print("DEVICE COVERAGE: \(runnable.count) runnable, \(labs.count) labs, \(broken.count) failing")
+        print("DEVICE COVERAGE: \(runnable.count) runnable, \(labs.count) need a parser feature, \(beyond.count) need a runtime feature")
         if let data = try? JSONEncoder().encode(runnable.sorted()), let json = String(data: data, encoding: .utf8) {
             print("RUNNABLE_JSON:\(json)")
         }
-        for (id, why) in broken.prefix(60) { print("  FAIL \(id): \(why.prefix(160))") }
+        for (id, why) in beyond.prefix(60) { print("  BEYOND \(id): \(why.prefix(160))") }
         for id in labs.prefix(60) { print("  LAB  \(id)") }
         #expect(runnable.count > 20, "The engine should cover a useful part of the course, not almost none.")
+
+        guard let supportURL = Resources.url("device-support.json"),
+              let supportData = try? Data(contentsOf: supportURL),
+              let shipped = try? JSONDecoder().decode(DeviceSupport.self, from: supportData) else {
+            Issue.record("device-support.json is missing from ZeroToHero/Resources.")
+            return
+        }
+        #expect(Set(shipped.runnable) == Set(runnable),
+                "device-support.json is stale. Replace its runnable array with the RUNNABLE_JSON line above.")
     }
+}
+
+private struct DeviceSupport: Decodable {
+    let runnable: [String]
 }
 
 @Suite("Diagnostics")

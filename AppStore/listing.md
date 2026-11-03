@@ -28,14 +28,17 @@ Compute, App Intents, SwiftData in iCloud, ShareLink and Live Activities.
 network, no account, no upload. On the Mac the app uses the Mac's own Swift compiler. Exercises that need the full
 compiler open as Xcode labs, with the tests and starting code in front of you.
 
-**Apple Intelligence where it helps.** A coach explains a compiler error without rewriting your code, a review turns a
-lesson into three questions, and you can ask for a small extra lesson on a topic. It all runs on device.
+**Apple Intelligence where it helps.** A coach explains a compiler error without rewriting your code, a review of a
+working solution suggests one small improvement, a recap turns a lesson into three questions, and you can ask for a
+small extra lesson with a scratch editor. The weekly plan picks the lessons for you; Apple Intelligence only adds the
+encouragement. It all runs on device.
 
 **Progress that follows you.** Finished lessons, your code, streaks and milestones sync through your own private iCloud.
-If iCloud is unavailable, everything still works on the device and Settings says so.
+If iCloud is unavailable, everything still works on the device and Settings says so. Your accent colour and editor size
+follow you too.
 
-**Milestones worth sharing.** Twenty-four badges, from First Step to Zero to Hero, with a share card for Messages and
-social.
+**Milestones worth sharing.** Twenty-four badges, from First Step to Zero to Hero, with a new-milestone celebration and
+a 1080×1350 share card for Messages and social.
 
 No account. No ads. No tracking. No Asteria server.
 
@@ -54,24 +57,34 @@ swiftdata, icloud
 
 - Rebuilt for iOS 27 and macOS 27, one app for iPhone, iPad and Mac.
 - Serverless exercise checking on device.
-- iCloud progress and milestones.
-- Apple Intelligence coach, reviews and extra lessons.
+- iCloud progress and milestones, with settings that follow you.
+- Apple Intelligence coach, code review, recaps, extra lessons and a weekly study plan.
+- My Lessons: keep a generated lesson and try its code in a scratch editor.
 - Siri, Spotlight and Handoff.
 - A new Modern Apple chapter.
 - A new visual design.
 
 ## Screenshots in this folder
 
+The required App Store Connect set, captured from build 6:
+
 | File | Size | Screen |
 | --- | --- | --- |
-| `6.9-1-home.png` | 1320×2868 | Course home, progress, today |
+| `6.9-1-home.png` | 1320×2868 | Course home, progress, today and this week |
 | `6.9-2-exercise.png` | 1320×2868 | A passing exercise with the console |
 | `6.9-3-milestones.png` | 1320×2868 | Milestones, earned and locked |
 | `ipad-1-home.png` | 2064×2752 | iPad Pro 13-inch home |
+| `mac-2880.png` | 2880×1800 | The Mac app |
+
+Extra captures for the listing, support pages and press:
+
+| File | Size | Screen |
+| --- | --- | --- |
 | `7-classes.png` | 1206×2622 | A class exercise, reference semantics |
 | `3-modern-apple.png` | 1206×2622 | A Foundation Models lesson |
 | `5-xcode-lab.png` | 1206×2622 | An Xcode lab lesson |
-| `mac-2880.png` | 2880×1800 | The Mac app |
+| `apple-intelligence.png` | 2856×1800 | An Apple Intelligence sheet, cropped |
+| `icloud-settings.png` | 2880×1800 | Settings showing the iCloud status |
 
-All three device families now have captures at App Store Connect's required sizes: 1320×2868 iPhone, 2064×2752 iPad,
-2880×1800 Mac.
+The 1206×2622 files and the 2856×1800 crop are not the required upload sizes; do not use them in App Store Connect.
+The 6.9-inch, 13-inch iPad and Mac sets above are.

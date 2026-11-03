@@ -293,7 +293,8 @@ struct ShareCard: View {
 
     @MainActor func render() -> ShareImage {
         let renderer = ImageRenderer(content: self)
-        renderer.scale = 2
+        // The card is already 1080 by 1350 points. Scale 1 keeps the exported PNG at that exact size.
+        renderer.scale = 1
         #if os(macOS)
         if let image = renderer.nsImage, let tiff = image.tiffRepresentation,
            let rep = NSBitmapImageRep(data: tiff), let data = rep.representation(using: .png, properties: [:]) {
