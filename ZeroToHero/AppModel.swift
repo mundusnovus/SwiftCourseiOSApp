@@ -143,7 +143,7 @@ enum Demo {
         guard arguments.contains("-screenshots") || arguments.contains("-demo") else { return }
         DispatchQueue.main.async {
             guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
-            window.setFrame(NSRect(x: 40, y: 40, width: 1280, height: 820), display: true)
+            window.setFrame(NSRect(x: 40, y: 40, width: 1440, height: 900), display: true)
             NSApp.activate()
         }
         #endif

@@ -71,7 +71,7 @@ swiftdata, icloud
 | `7-classes.png` | 1206×2622 | A class exercise, reference semantics |
 | `3-modern-apple.png` | 1206×2622 | A Foundation Models lesson |
 | `5-xcode-lab.png` | 1206×2622 | An Xcode lab lesson |
-| `6-mac.png` | desktop | The Mac app |
+| `mac-2880.png` | 2880×1800 | The Mac app |
 
-The 6.9-inch iPhone and 13-inch iPad captures are at App Store Connect's required sizes. The Mac shot still needs a
-clean 2880×1800 capture without other windows behind it.
+All three device families now have captures at App Store Connect's required sizes: 1320×2868 iPhone, 2064×2752 iPad,
+2880×1800 Mac.

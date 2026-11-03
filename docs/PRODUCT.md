@@ -47,9 +47,13 @@ Version 2.0 of Swift: Zero to Hero for Mac and iOS, from the owner's seven point
 - Every lesson has a title and description; every quiz has one correct answer; ids are unique.
 - Settings tells the truth about iCloud and Apple Intelligence.
 
-Not yet at the bar: signed device install, iCloud sync between two devices, Siri phrases on hardware, Spotlight
-results, PCC (entitlement), archive/export, VoiceOver and Dynamic Type on hardware. These are listed in every report
-until they are done.
+At the bar: both platforms archive and export locally with an Apple Distribution profile, production iCloud and
+`get-task-allow` false; the iPhone 6.9-inch, iPad 13-inch and Mac screenshots are at the required sizes; the listing
+and review notes are written.
+
+Not yet at the bar: a signed install on a physical device, iCloud sync between two devices, Siri phrases and Spotlight
+results on hardware, PCC (entitlement), upload to App Store Connect, VoiceOver and Dynamic Type on hardware. These are
+listed in every report until they are done.
 
 ## Out of scope for 2.0.0
 

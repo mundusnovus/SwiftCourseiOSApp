@@ -81,12 +81,13 @@ in this build. The privacy manifest declares UserDefaults (`CA92.1`) and no trac
 
 ## Status
 
-Verified: both platforms build; the on-device engine passes 61 exercise solutions and the app runs a lesson end to end
-on the iPhone 17 simulator; the Mac app launches; the kit has 12 tests.
+Verified: both platforms build in Debug and Release; `tools/archive.sh ios` and `tools/archive.sh mac` both produce a
+real archive and a local App Store export (`Swift Zero to Hero.ipa` and `Swift Zero to Hero.pkg`), signed with an Apple
+Distribution profile, production iCloud and `get-task-allow` false; the on-device engine passes 61 exercise solutions;
+the app runs end to end on iPhone and iPad simulators; the Mac app launches signed; the kit has 12 tests.
 
-Not verified in this build: a signed device install, iCloud sync between two devices, Siri phrases on a device,
-Spotlight results, Private Cloud Compute (entitlement not granted), archives and App Store upload, VoiceOver and
-Dynamic Type on hardware.
+Not verified: upload to App Store Connect (yours to do), iCloud sync between two signed devices, Siri phrases and
+Spotlight results on hardware, Private Cloud Compute (entitlement not granted), VoiceOver and Dynamic Type on hardware.
 
 ## License
 
