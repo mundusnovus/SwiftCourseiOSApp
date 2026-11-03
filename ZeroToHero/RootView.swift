@@ -6,6 +6,7 @@ import ZeroToHeroKit
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @State private var compactColumn: NavigationSplitViewColumn = .detail
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("accent") private var accentRaw = AccentChoice.sea.rawValue
 
     private var accent: Color { (AccentChoice(rawValue: accentRaw) ?? .sea).color }
@@ -17,7 +18,9 @@ struct RootView: View {
                 .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 380)
         } detail: {
             Group {
-                if let lesson = model.selectedLesson {
+                if let custom = model.customLesson {
+                    CustomLessonView(lesson: custom).id(custom.persistentModelID)
+                } else if let lesson = model.selectedLesson {
                     LessonView(lesson: lesson).id(lesson.id)
                 } else {
                     HomeView()
@@ -31,7 +34,14 @@ struct RootView: View {
         .sheet(isPresented: $model.showSettings) { SettingsView().tint(accent) }
         .sheet(isPresented: $model.showAchievements) { AchievementsView().tint(accent) }
         .sheet(isPresented: $model.showStudy) { StudySheet().tint(accent) }
+        .sheet(isPresented: $model.showPlan) { StudyPlanSheet().tint(accent) }
+        .sheet(isPresented: newMilestones) { NewMilestonesSheet().tint(accent) }
         .onChange(of: model.selection) { _, _ in compactColumn = .detail }
+        .onChange(of: model.customSelection) { _, _ in compactColumn = .detail }
+        .onChange(of: scenePhase) { _, phase in
+            // Pick up progress from the person's other devices when they come back to this one.
+            if phase == .active { model.store.refresh() }
+        }
         .onContinueUserActivity("technology.asteria.zerotohero.lesson") { activity in
             if let id = activity.userInfo?["lesson"] as? String, let lesson = model.course.lesson(id) {
                 model.open(lesson)
@@ -42,7 +52,21 @@ struct RootView: View {
                 guard let id, let lesson = model.course.lesson(id) else { model.open(nil); return }
                 model.open(lesson)
             }
+            AppRouter.showMilestones = { model.showAchievements = true }
             await model.findRunner()
+        }
+    }
+
+    /// A badge was earned: celebrate it once, with a way to share it, unless another sheet is already up.
+    private var newMilestones: Binding<Bool> {
+        Binding(get: { !model.store.lastEarned.isEmpty && !model.showAchievements && !model.showSettings },
+                set: { if !$0 { model.store.clearNewBadges() } })
+    }
+
+    private var intelligenceMenu: some View {
+        Menu("Apple Intelligence", systemImage: "apple.intelligence") {
+            Button("Plan My Week", systemImage: "calendar") { model.showPlan = true }
+            Button("Make a Lesson", systemImage: "text.badge.plus") { model.showStudy = true }
         }
     }
 
@@ -59,13 +83,13 @@ struct RootView: View {
         #endif
         #if os(iOS)
         ToolbarItemGroup(placement: .topBarTrailing) {
-            Button("Make a lesson", systemImage: "apple.intelligence") { model.showStudy = true }
+            intelligenceMenu
             Button("Achievements", systemImage: "trophy") { model.showAchievements = true }
             Button("Settings", systemImage: "gearshape") { model.showSettings = true }
         }
         #else
         ToolbarItemGroup(placement: .primaryAction) {
-            Button("Make a lesson", systemImage: "apple.intelligence") { model.showStudy = true }
+            intelligenceMenu
             Button("Achievements", systemImage: "trophy") { model.showAchievements = true }
         }
         #endif
@@ -121,6 +145,22 @@ struct Sidebar: View {
                     }
                 }
                 .buttonStyle(.plain)
+            }
+
+            if !model.store.custom.isEmpty && search.isEmpty {
+                Section("My Lessons") {
+                    ForEach(model.store.custom) { custom in
+                        Button { model.open(custom) } label: {
+                            Label {
+                                Text(custom.title).font(.reading(.body)).lineLimit(2)
+                            } icon: {
+                                Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.emphasis)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(model.customSelection == custom.persistentModelID ? Palette.sea.opacity(0.15) : nil)
+                    }
+                }
             }
 
             ForEach(model.course.chapters) { chapter in
@@ -233,6 +273,7 @@ struct LessonRow: View {
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("minutesPerDay") private var minutesPerDay = 30
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var widthClass
     private var compact: Bool { widthClass == .compact }
@@ -246,6 +287,7 @@ struct HomeView: View {
                 hero
                 if let next = model.nextLesson { continueCard(next) } else { finishedCard }
                 todayCard
+                weekCard
                 badgesStrip
                 chapters
                 Text("Made by Asteria Technology. Open source under the Asteria License.")
@@ -327,29 +369,12 @@ struct HomeView: View {
     private var todayCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("TODAY").font(.reading(.caption2, weight: .bold)).tracking(1).foregroundStyle(.secondary)
-            if compact {
-                VStack(spacing: 8) {
-                    if let next = model.nextLesson {
-                        todayRow(icon: "play.fill", tint: Palette.sea, title: "Next lesson", detail: next.title, horizontal: true) { model.open(next) }
-                    }
-                    todayRow(icon: "trophy.fill", tint: Palette.gold, title: "Milestones", detail: "\(model.store.badges.count) earned", horizontal: true) {
-                        model.showAchievements = true
-                    }
-                    todayRow(icon: "flame.fill", tint: Palette.alert, title: "Streak", detail: "\(model.store.streak) days", horizontal: true) {
-                        model.showAchievements = true
-                    }
+            HStack(spacing: 12) {
+                todayRow(icon: "trophy.fill", tint: Palette.gold, title: "Milestones", detail: "\(model.store.badges.count) earned") {
+                    model.showAchievements = true
                 }
-            } else {
-                HStack(spacing: 12) {
-                    if let next = model.nextLesson {
-                        todayRow(icon: "play.fill", tint: Palette.sea, title: "Next lesson", detail: next.title) { model.open(next) }
-                    }
-                    todayRow(icon: "trophy.fill", tint: Palette.gold, title: "Milestones", detail: "\(model.store.badges.count) earned") {
-                        model.showAchievements = true
-                    }
-                    todayRow(icon: "flame.fill", tint: Palette.alert, title: "Streak", detail: "\(model.store.streak) days") {
-                        model.showAchievements = true
-                    }
+                todayRow(icon: "flame.fill", tint: Palette.alert, title: "Streak", detail: "\(model.store.streak) days") {
+                    model.showAchievements = true
                 }
             }
         }
@@ -427,9 +452,11 @@ struct HomeView: View {
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.quaternary))
     }
 
+    /// Opens the first unfinished lesson in the chapter, or its first lesson when it is all done.
     private func chapterRow(_ index: Int, _ chapter: Chapter) -> some View {
         let done = model.store.count(in: chapter.lessons)
-        return HStack(alignment: .top, spacing: 14) {
+        let target = chapter.lessons.first { !model.store.isDone($0.id) } ?? chapter.lessons.first
+        return Button { model.open(target) } label: { HStack(alignment: .top, spacing: 14) {
             Text(String(format: "%02d", index + 1))
                 .font(.reading(.title3, weight: .bold)).monospacedDigit()
                 .foregroundStyle(Palette.emphasis).frame(width: 34, alignment: .leading)
@@ -441,7 +468,51 @@ struct HomeView: View {
             Spacer(minLength: 8)
             Text("\(done)/\(chapter.lessons.count)")
                 .font(.reading(.caption, weight: .medium)).monospacedDigit().foregroundStyle(.secondary)
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).padding(.top, 4)
         }
+        .contentShape(.rect) }
+        .buttonStyle(.plain)
+        .accessibilityHint(done == chapter.lessons.count ? "Opens the chapter" : "Continues the chapter")
+    }
+
+    /// Today's slice of the week plan, so the plan is one glance away, not one menu away.
+    private var weekCard: some View {
+        let plan = model.plan(minutesPerDay: minutesPerDay)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("THIS WEEK").font(.reading(.caption2, weight: .bold)).tracking(1).foregroundStyle(.secondary)
+                Spacer()
+                Button("See the week") { model.showPlan = true }.font(.reading(.caption, weight: .semibold))
+            }
+            if let today = plan.days.first {
+                ForEach(today.lessons.prefix(3)) { lesson in
+                    Button { model.open(lesson) } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: lesson.type.symbol).symbol().foregroundStyle(Palette.seaText).frame(width: 22)
+                            Text(lesson.title).font(.reading(.callout)).lineLimit(1)
+                            Spacer()
+                            Text("\(lesson.minutes) min").font(.reading(.caption)).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if let review = plan.review.first {
+                Button { model.open(review) } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.counterclockwise").symbol().foregroundStyle(Palette.emphasis).frame(width: 22)
+                        Text("Review: \(review.title)").font(.reading(.callout)).lineLimit(1)
+                        Spacer()
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .background(.background.opacity(0.7), in: .rect(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.quaternary))
     }
 }
 

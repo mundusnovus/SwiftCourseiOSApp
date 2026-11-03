@@ -20,6 +20,9 @@ enum Palette {
     static let pass = Color(hex: 0x4CAF7A)
     /// Gold for small emphasis. Gold deep on light surfaces keeps 4.5:1 contrast.
     static let emphasis = Color(light: 0xA8761A, dark: 0xE9B04B)
+    /// Sea and alert for text and small symbols. Plain `sea` (#1C8C9E) is 3.9:1 on white, under the 4.5:1 bar.
+    static let seaText = Color(light: 0x116674, dark: 0x3BB3C3)
+    static let alertText = Color(light: 0xB23A26, dark: 0xFF9B85)
 
     // The editor is always dark, like Xcode's default.
     static let editorBackground = Color(hex: 0x0E1B20)

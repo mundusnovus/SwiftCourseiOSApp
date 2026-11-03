@@ -23,6 +23,16 @@ final class LessonRecord {
         get { Set(tickList.split(separator: ",").compactMap { Int($0) }) }
         set { tickList = newValue.sorted().map(String.init).joined(separator: ",") }
     }
+
+    /// Folds in a copy of the same lesson made on another device. Nothing finished is lost: the earliest finish wins,
+    /// ticks are combined, and the code from the device that opened the lesson last is kept.
+    func merge(_ other: LessonRecord) {
+        if let theirs = other.doneAt { doneAt = min(doneAt ?? theirs, theirs) }
+        ticks = ticks.union(other.ticks)
+        let mineIsNewer = (lastOpened ?? .distantPast) >= (other.lastOpened ?? .distantPast)
+        if code == nil || (!mineIsNewer && other.code != nil) { code = other.code }
+        lastOpened = [lastOpened, other.lastOpened].compactMap { $0 }.max()
+    }
 }
 
 @Model
@@ -40,6 +50,23 @@ final class ProfileRecord {
     var lastActive: Date?
     var started: Date = Date.now
     init() {}
+
+    /// Two devices that started offline each made a profile. Keep the longest history and the most recent day.
+    func merge(_ other: ProfileRecord) {
+        if (other.lastActive ?? .distantPast) > (lastActive ?? .distantPast) {
+            lastActive = other.lastActive
+            streak = other.streak
+        } else if other.lastActive == lastActive {
+            streak = max(streak, other.streak)
+        }
+        bestStreak = max(bestStreak, other.bestStreak, streak)
+        started = min(started, other.started)
+    }
+}
+
+extension Course {
+    /// The course shipped in the app, decoded once for the window, Siri and Spotlight.
+    static let app: Course = (try? Course.load()) ?? .fallback
 }
 
 @Model
@@ -151,8 +178,14 @@ final class LearnerStore {
     private var profile: ProfileRecord
 
     private(set) var badges: Set<String> = []
+    private var earnedAt: [String: Date] = [:]
+    private(set) var custom: [CustomLessonRecord] = []
+    /// Badges earned since the person last saw the celebration. The window shows them, then clears the list.
     private(set) var lastEarned: [Achievement] = []
     var errorMessage: String?
+    /// Set when the person comes back after a week or more away; the "Back Again" badge reads it once.
+    private var cameBack = false
+    private var course: Course { .app }
 
     private init() {
         #if DEBUG
@@ -179,21 +212,19 @@ final class LearnerStore {
         }
         load()
         migrateLegacyProgressIfNeeded()
-        #if DEBUG
-        if Demo.isOn && Demo.arguments.contains("-seedprogress") { seedDemoProgress() }
-        #endif
+        if inCloud { watchRemoteChanges() }
     }
 
     #if DEBUG
     /// A few finished lessons and badges so screenshots and the review recording show the product at its best.
     private func seedDemoProgress() {
-        guard let course = try? Course.load() else { return }
         for lesson in course.lessons.prefix(7) {
             let record = record(lesson.id)
             record.doneAt = .now.addingTimeInterval(-Double.random(in: 0...86400))
         }
         profile.streak = 4
         profile.bestStreak = 6
+        profile.lastActive = Calendar.current.startOfDay(for: .now)
         for id in ["first-step", "hello-world", "first-pass", "five-lessons", "streak-3", "chapter-one"] {
             if !badges.contains(id) {
                 context.insert(AchievementRecord(achievementID: id))
@@ -204,10 +235,58 @@ final class LearnerStore {
     }
     #endif
 
+    /// Reads everything into memory. Two devices that worked offline can each have made a record for the same lesson,
+    /// badge or profile; CloudKit keeps both, so copies are merged here and the extras deleted.
     private func load() {
-        records = [:]
-        for record in (try? context.fetch(FetchDescriptor<LessonRecord>())) ?? [] { records[record.lessonID] = record }
-        badges = Set(((try? context.fetch(FetchDescriptor<AchievementRecord>())) ?? []).map(\.achievementID))
+        var merged = false
+
+        var byLesson: [String: LessonRecord] = [:]
+        for record in (try? context.fetch(FetchDescriptor<LessonRecord>())) ?? [] {
+            guard let keep = byLesson[record.lessonID] else { byLesson[record.lessonID] = record; continue }
+            keep.merge(record)
+            context.delete(record)
+            merged = true
+        }
+        records = byLesson
+
+        var firstEarned: [String: AchievementRecord] = [:]
+        for badge in (try? context.fetch(FetchDescriptor<AchievementRecord>())) ?? [] {
+            guard let keep = firstEarned[badge.achievementID] else { firstEarned[badge.achievementID] = badge; continue }
+            keep.earnedAt = min(keep.earnedAt, badge.earnedAt)
+            context.delete(badge)
+            merged = true
+        }
+        badges = Set(firstEarned.keys)
+        earnedAt = firstEarned.mapValues(\.earnedAt)
+
+        let profiles = (try? context.fetch(FetchDescriptor<ProfileRecord>())) ?? []
+        if let keep = profiles.first(where: { $0 === profile }) ?? profiles.first {
+            for other in profiles where other !== keep {
+                keep.merge(other)
+                context.delete(other)
+                merged = true
+            }
+            profile = keep
+        }
+
+        custom = (try? context.fetch(FetchDescriptor<CustomLessonRecord>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)]))) ?? []
+        if merged { save() }
+    }
+
+    /// CloudKit imports changes from the person's other devices in the background. Reload when it does, so the
+    /// sidebar, badges and streak follow without a relaunch, and so a lesson is never given a second record.
+    private func watchRemoteChanges() {
+        Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: .NSPersistentStoreRemoteChange) {
+                try? await Task.sleep(for: .milliseconds(300))
+                self?.refresh()
+            }
+        }
+    }
+
+    /// Re-reads the store. Called after an iCloud import and when the app comes to the front.
+    func refresh() {
+        load()
     }
 
     // MARK: Reading
@@ -223,8 +302,27 @@ final class LearnerStore {
     func isDone(_ id: Lesson.ID) -> Bool { records[id]?.doneAt != nil }
     func code(for lesson: Lesson) -> String { records[lesson.id]?.code ?? lesson.seed ?? "" }
     func ticks(for id: Lesson.ID) -> Set<Int> { records[id]?.ticks ?? [] }
-    var lastLesson: Lesson.ID? { UserDefaults.standard.string(forKey: "lastLesson") }
-    var streak: Int { profile.streak }
+    func earnedDate(_ badge: String) -> Date? { earnedAt[badge] }
+
+    /// When each finished lesson was finished, for the study plan.
+    var doneDates: [Lesson.ID: Date] {
+        records.reduce(into: [:]) { out, item in if let date = item.value.doneAt { out[item.key] = date } }
+    }
+
+    /// The lesson opened most recently on any of the person's devices, so Continue on the Mac picks up where the
+    /// iPhone left off. Falls back to this device's own memory before anything has synced.
+    var lastLesson: Lesson.ID? {
+        records.values.filter { $0.lastOpened != nil }.max { ($0.lastOpened ?? .distantPast) < ($1.lastOpened ?? .distantPast) }?.lessonID
+            ?? UserDefaults.standard.string(forKey: "lastLesson")
+    }
+
+    /// The streak as it stands today: a streak whose last day was before yesterday is already broken.
+    var streak: Int {
+        guard let last = profile.lastActive else { return 0 }
+        let calendar = Calendar.current
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: last), to: calendar.startOfDay(for: .now)).day ?? 0
+        return days <= 1 ? profile.streak : 0
+    }
     var bestStreak: Int { profile.bestStreak }
 
     func count(in lessons: [Lesson]) -> Int { lessons.filter { isDone($0.id) }.count }
@@ -236,6 +334,7 @@ final class LearnerStore {
         UserDefaults.standard.set(id, forKey: "lastLesson")
         touchStreak()
         save()
+        if cameBack { evaluateBadges() }
     }
 
     func complete(_ id: Lesson.ID) {
@@ -247,6 +346,7 @@ final class LearnerStore {
     }
 
     func setCode(_ code: String, for id: Lesson.ID) {
+        guard records[id]?.code != code else { return }
         record(id).code = code
         saveSoon()
     }
@@ -264,15 +364,20 @@ final class LearnerStore {
         save()
     }
 
+    /// Forgets lessons, code, ticks, streaks and badges. Lessons the person made with Apple Intelligence are theirs and
+    /// stay; they can delete those one by one.
     func resetAll() {
         for record in records.values { context.delete(record) }
         for badge in (try? context.fetch(FetchDescriptor<AchievementRecord>())) ?? [] { context.delete(badge) }
         records = [:]
         badges = []
+        earnedAt = [:]
+        lastEarned = []
         profile.streak = 0
         profile.bestStreak = 0
         profile.lastActive = nil
         profile.started = .now
+        UserDefaults.standard.removeObject(forKey: "lastLesson")
         save()
     }
 
@@ -290,18 +395,17 @@ final class LearnerStore {
         }
         let lastDay = calendar.startOfDay(for: last)
         if lastDay == today { return }
-        if calendar.dateComponents([.day], from: lastDay, to: today).day == 1 {
-            profile.streak += 1
-        } else {
-            profile.streak = 1
-        }
+        let gap = calendar.dateComponents([.day], from: lastDay, to: today).day ?? 0
+        profile.streak = gap == 1 ? profile.streak + 1 : 1
+        // Read before lastActive moves to today, or the gap is lost.
+        if gap >= 7 { cameBack = true }
         profile.lastActive = today
         profile.bestStreak = max(profile.bestStreak, profile.streak)
     }
 
     // MARK: Badges
 
-    func snapshot(course: Course) -> ProgressSnapshot {
+    func snapshot() -> ProgressSnapshot {
         var snapshot = ProgressSnapshot()
         snapshot.done = Set(records.values.filter { $0.doneAt != nil }.map(\.lessonID))
         snapshot.totalLessons = course.lessons.count
@@ -317,22 +421,23 @@ final class LearnerStore {
             completedChapters.insert(chapter.title)
         }
         snapshot.chaptersDone = completedChapters.count
-        if let last = profile.lastActive, let days = Calendar.current.dateComponents([.day], from: last, to: .now).day, days >= 7 {
-            snapshot.cameBackAfterBreak = true
-        }
+        snapshot.cameBackAfterBreak = cameBack
         snapshot.completedChapters = completedChapters
         return snapshot
     }
 
     func evaluateBadges() {
-        guard let course = try? Course.load() else { return }
-        let snapshot = snapshot(course: course)
+        let snapshot = snapshot()
+        cameBack = false
         let earned = Achievements.earned(snapshot, course: course, completedChapters: snapshot.completedChapters)
         let new = earned.subtracting(badges)
         guard !new.isEmpty else { return }
-        for id in new {
-            context.insert(AchievementRecord(achievementID: id))
-            if let badge = Achievements.byID(id) { lastEarned.append(badge) }
+        // Show them in the order the list defines, so the celebration reads bronze before silver.
+        for badge in Achievements.all where new.contains(badge.id) {
+            let record = AchievementRecord(achievementID: badge.id)
+            context.insert(record)
+            earnedAt[badge.id] = record.earnedAt
+            lastEarned.append(badge)
         }
         badges.formUnion(new)
         save()
@@ -345,10 +450,13 @@ final class LearnerStore {
     func addCustomLesson(title: String, summary: String, body: String) {
         context.insert(CustomLessonRecord(title: title, summary: summary, body: body))
         save()
+        load()
     }
 
-    func customLessons() -> [CustomLessonRecord] {
-        (try? context.fetch(FetchDescriptor<CustomLessonRecord>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)]))) ?? []
+    func delete(_ lesson: CustomLessonRecord) {
+        context.delete(lesson)
+        save()
+        load()
     }
 
     // MARK: Saving

@@ -12,32 +12,59 @@ public nonisolated struct Course: Decodable, Sendable {
     /// v2: the date the course was last checked against a shipping OS. Optional so older exports load.
     public let updated: String?
 
-    public var lessons: [Lesson] { chapters.flatMap { $0.modules.flatMap(\.lessons) } }
+    /// Every lesson in course order, and where each one sits. Built once at decode time: views read these on every
+    /// update, so they must not be rebuilt each time.
+    public let lessons: [Lesson]
+    private let positions: [Lesson.ID: Position]
 
-    public func lesson(_ id: Lesson.ID) -> Lesson? { lessons.first { $0.id == id } }
+    private struct Position: Sendable {
+        let index: Int
+        let chapter: Int
+        let module: Int
+    }
 
-    public func module(of id: Lesson.ID) -> (chapter: Chapter, module: Module)? {
-        for chapter in chapters {
-            for module in chapter.modules where module.lessons.contains(where: { $0.id == id }) {
-                return (chapter, module)
+    private enum CodingKeys: String, CodingKey { case id, title, subtitle, versions, summary, chapters, updated }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        subtitle = try c.decode(String.self, forKey: .subtitle)
+        versions = try c.decode(String.self, forKey: .versions)
+        summary = try c.decode(String.self, forKey: .summary)
+        chapters = try c.decode([Chapter].self, forKey: .chapters)
+        updated = try c.decodeIfPresent(String.self, forKey: .updated)
+        var lessons: [Lesson] = []
+        var positions: [Lesson.ID: Position] = [:]
+        for (ci, chapter) in chapters.enumerated() {
+            for (mi, module) in chapter.modules.enumerated() {
+                for lesson in module.lessons {
+                    positions[lesson.id] = Position(index: lessons.count, chapter: ci, module: mi)
+                    lessons.append(lesson)
+                }
             }
         }
-        return nil
+        self.lessons = lessons
+        self.positions = positions
+    }
+
+    public func lesson(_ id: Lesson.ID) -> Lesson? { positions[id].map { lessons[$0.index] } }
+
+    public func module(of id: Lesson.ID) -> (chapter: Chapter, module: Module)? {
+        guard let p = positions[id] else { return nil }
+        return (chapters[p.chapter], chapters[p.chapter].modules[p.module])
     }
 
     public func neighbours(of id: Lesson.ID) -> (previous: Lesson?, next: Lesson?) {
-        let all = lessons
-        guard let i = all.firstIndex(where: { $0.id == id }) else { return (nil, nil) }
-        return (i > 0 ? all[i - 1] : nil, i + 1 < all.count ? all[i + 1] : nil)
+        guard let i = positions[id]?.index else { return (nil, nil) }
+        return (i > 0 ? lessons[i - 1] : nil, i + 1 < lessons.count ? lessons[i + 1] : nil)
     }
 
     /// The next lesson that is not done, in course order. When `id` itself is unfinished it is returned first, which is
     /// what Continue should do; when it is done, the search starts with the lesson after it.
     public func next(after id: Lesson.ID?, done: (Lesson.ID) -> Bool) -> Lesson? {
-        let all = lessons
-        let start = id.flatMap { wanted in all.firstIndex { $0.id == wanted } } ?? 0
-        let ordered = Array(all[start...]) + Array(all[..<start])
-        return ordered.first { !done($0.id) }
+        let start = id.flatMap { positions[$0]?.index } ?? 0
+        return lessons[start...].first { !done($0.id) } ?? lessons[..<start].first { !done($0.id) }
     }
 
     public var exerciseCount: Int { lessons.filter(\.hasCode).count }
@@ -165,6 +192,24 @@ public nonisolated indirect enum Block: Decodable, Sendable {
         default: self = .paragraph(try c.decodeIfPresent(String.self, forKey: .text) ?? "")
         }
     }
+}
+
+extension Block {
+    /// The block as plain text, for a model prompt or a search: no Markdown structure, code kept as written.
+    public var plainText: String {
+        switch self {
+        case .heading(_, let text), .paragraph(let text): text
+        case .code(_, let code): code
+        case .list(_, let items): items.map { "- " + $0 }.joined(separator: "\n")
+        case .note(_, let blocks), .quote(let blocks): blocks.plainText
+        case .table(let head, let rows): ([head] + rows).map { $0.joined(separator: " | ") }.joined(separator: "\n")
+        case .rule: ""
+        }
+    }
+}
+
+extension [Block] {
+    public var plainText: String { map(\.plainText).filter { !$0.isEmpty }.joined(separator: "\n\n") }
 }
 
 extension Course {

@@ -1,16 +1,18 @@
 // A lesson: reading with quizzes and checklists, or a code lesson with the editor, tests and console.
 import SwiftUI
+import AppIntents
 import ZeroToHeroKit
 #if os(iOS)
 import UIKit
 #endif
 
 struct LessonView: View {
+    @Environment(AppModel.self) private var model
     let lesson: Lesson
 
     var body: some View {
         Group {
-            if lesson.hasCode && DeviceSupport.isRunnable(lesson.id) {
+            if lesson.hasCode && (DeviceSupport.isRunnable(lesson.id) || model.hasCompiler) {
                 CodeLessonView(lesson: lesson)
             } else if lesson.hasCode {
                 LabLessonView(lesson: lesson)
@@ -22,6 +24,8 @@ struct LessonView: View {
             activity.title = lesson.title
             activity.userInfo = ["lesson": id]
             activity.isEligibleForHandoff = true
+            // "This lesson" for Siri and Apple Intelligence: the screen is about this entity.
+            activity.appEntityIdentifier = EntityIdentifier(for: LessonEntity.self, identifier: id)
         }
     }
 }
@@ -227,7 +231,7 @@ struct QuizView: View {
                     if checked, let pick = picks[qi] {
                         let right = question.answers[pick].correct
                         Text(markdown((right ? "**Right.** " : "**Not quite.** ") + question.why))
-                            .foregroundStyle(right ? Palette.sea : Palette.alert)
+                            .foregroundStyle(right ? Palette.seaText : Palette.alertText)
                             .font(.reading(.callout))
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -515,9 +519,10 @@ struct CodeLessonView: View {
             }
             .frame(minHeight: compact ? 90 : 150, idealHeight: compact ? 130 : 220, maxHeight: compact ? 180 : 290)
 
-            if let result, !result.compiled || result.crashed || result.timedOut {
+            if let result, !result.passed, !result.unsupported {
                 Button { showCoach = true } label: {
-                    Label("Explain this with Apple Intelligence", systemImage: "apple.intelligence")
+                    Label(result.compiled ? "Why doesn't it pass? Ask the coach" : "Explain this error with Apple Intelligence",
+                          systemImage: "apple.intelligence")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
@@ -526,12 +531,10 @@ struct CodeLessonView: View {
                 .environment(\.colorScheme, .dark)
             }
 
-            if result?.passed == true, let next = model.course.neighbours(of: lesson.id).next {
-                HStack {
-                    Label("Every test passes. Lesson done.", systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(Palette.pass).font(.reading(.callout, weight: .semibold))
-                    Spacer()
-                    Button("Next: \(next.title)") { model.open(next) }.buttonStyle(.glassProminent)
+            if result?.passed == true {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { passedLabel; Spacer(); reviewButton; nextButton }
+                    VStack(alignment: .leading, spacing: 8) { passedLabel; HStack { reviewButton; nextButton } }
                 }
                 .padding(12)
                 .background(Palette.editorBackground)
@@ -539,6 +542,24 @@ struct CodeLessonView: View {
             }
         }
         .background(Palette.editorBackground)
+    }
+
+    private var passedLabel: some View {
+        Label("Every test passes. Lesson done.", systemImage: "checkmark.seal.fill")
+            .foregroundStyle(Palette.pass).font(.reading(.callout, weight: .semibold))
+    }
+
+    private var reviewButton: some View {
+        Button("Review my code", systemImage: "apple.intelligence") { showCoach = true }
+            .buttonStyle(.glass)
+    }
+
+    @ViewBuilder private var nextButton: some View {
+        if let next = model.course.neighbours(of: lesson.id).next {
+            Button { model.open(next) } label: { Label("Next lesson", systemImage: "arrow.right") }
+                .buttonStyle(.glassProminent)
+                .help(next.title)
+        }
     }
 
     private func run() {
@@ -585,7 +606,7 @@ struct TestsList: View {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(systemName: passed == nil ? "circle" : (passed == true ? "checkmark.circle.fill" : "xmark.circle.fill"))
                         .symbol()
-                        .foregroundStyle(passed == nil ? Color.secondary : (passed == true ? Palette.sea : Palette.alert))
+                        .foregroundStyle(passed == nil ? Color.secondary : (passed == true ? Palette.seaText : Palette.alertText))
                     Text(markdown(test.text)).font(.reading(.callout)).fixedSize(horizontal: false, vertical: true)
                 }
                 .accessibilityElement(children: .combine)

@@ -175,7 +175,10 @@ public nonisolated struct Toolchain: Sendable {
         guard let found = [xcode, tools].first(where: { fm.isExecutableFile(atPath: $0.bin + "/swift-frontend") && fm.fileExists(atPath: $0.sdk) }),
               let v = try? await Shell.run(found.bin + "/swiftc", ["--version"], timeout: 20) else { return nil }
         let toolchain = Toolchain(swiftc: found.bin + "/swiftc", sdk: found.sdk, version: version(v.stdout + v.stderr), interpreter: found.bin + "/swift-frontend")
-        _ = await Runner.check(Lesson.warmUp, code: "print(1)", toolchain: toolchain, runTimeout: 120)
+        // The sandbox can let us find the compiler and still refuse to run it. Only a program that really printed
+        // counts; otherwise the app says so and uses the on-device engine.
+        let warm = await Runner.check(Lesson.warmUp, code: "print(1)", toolchain: toolchain, runTimeout: 120)
+        guard warm.compiled, !warm.crashed, !warm.timedOut, warm.output.trimmingCharacters(in: .whitespacesAndNewlines) == "1" else { return nil }
         return toolchain
     }
 

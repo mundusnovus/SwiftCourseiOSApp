@@ -1,6 +1,7 @@
 // The app's shared state: the course, the one progress store, the selected lesson, and the runner.
 import Foundation
 import Observation
+import SwiftData
 import SwiftUI
 import ZeroToHeroKit
 
@@ -24,6 +25,9 @@ final class AppModel {
     var showSettings = false
     var showAchievements = false
     var showStudy = false
+    var showPlan = false
+    /// A lesson the person kept from Apple Intelligence. Shown in the detail column instead of a course lesson.
+    var customSelection: PersistentIdentifier?
 
     init(course: Course, store: LearnerStore = .shared) {
         self.course = course
@@ -36,6 +40,7 @@ final class AppModel {
         if Demo.arguments.contains("-achievements") { showAchievements = true }
         if Demo.arguments.contains("-settings") { showSettings = true }
         if Demo.arguments.contains("-study") { showStudy = true }
+        if Demo.arguments.contains("-plan") { showPlan = true }
         #endif
     }
 
@@ -55,7 +60,24 @@ final class AppModel {
         selection.flatMap { course.module(of: $0)?.chapter }
     }
 
+    var customLesson: CustomLessonRecord? {
+        customSelection.flatMap { id in store.custom.first { $0.persistentModelID == id } }
+    }
+
+    func plan(minutesPerDay: Int) -> StudyPlan {
+        StudyPlan.make(course: course, done: store.doneDates, from: store.lastLesson, minutesPerDay: minutesPerDay)
+    }
+
+    func open(_ custom: CustomLessonRecord) {
+        selection = nil
+        customSelection = custom.persistentModelID
+        #if os(iOS)
+        columnVisibility = .detailOnly
+        #endif
+    }
+
     func open(_ lesson: Lesson?) {
+        customSelection = nil
         selection = lesson?.id
         if let lesson {
             store.open(lesson.id)
@@ -82,15 +104,19 @@ final class AppModel {
 
     // MARK: Runner
 
+    /// The Mac's own Swift compiler is installed and answered. Then every exercise runs here, including the labs the
+    /// on-device engine cannot check.
+    var hasCompiler: Bool {
+        if case .ready = runnerState { true } else { false }
+    }
+
     func findRunner() async {
-        #if os(macOS)
         #if os(macOS)
         if let toolchain = await Toolchain.find() {
             runner = LocalRunner(toolchain: toolchain)
             runnerState = .ready("Swift \(toolchain.version) on this Mac. Your code never leaves it.")
             return
         }
-        #endif
         runner = OnDeviceRunner()
         runnerState = .device("Checking on this device with the built-in engine. Install Xcode for the full compiler.")
         #else

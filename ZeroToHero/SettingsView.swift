@@ -1,5 +1,6 @@
 // Settings on both platforms: appearance, reading, iCloud, Apple Intelligence, progress, and the honest about block.
 import SwiftUI
+import AppIntents
 import ZeroToHeroKit
 
 struct SettingsView: View {
@@ -15,24 +16,31 @@ struct SettingsView: View {
 
     var body: some View {
         #if os(macOS)
-        Form { panes }
+        form
             .formStyle(.grouped)
-            .frame(width: 540, height: 620)
+            .frame(width: 540, height: 680)
             .appTint()
         #else
         NavigationStack {
-            Form { panes }
+            form
                 .navigationTitle("Settings")
                 .navigationBarTitleDisplayMode(.inline)
                 .tint(choice.color)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-                .confirmationDialog("Start the course again?", isPresented: $confirmReset, titleVisibility: .visible) {
-                    Button("Forget my progress and code", role: .destructive) { model.store.resetAll() }
-                } message: {
-                    Text("Every finished lesson and all your code will be forgotten. This cannot be undone.")
-                }
         }
         #endif
+    }
+
+    /// The reset confirmation lives on the form itself, so the button works on the Mac as well as on iPhone and iPad.
+    private var form: some View {
+        Form { panes }
+            .confirmationDialog("Start the course again?", isPresented: $confirmReset, titleVisibility: .visible) {
+                Button("Forget my progress and code", role: .destructive) { model.store.resetAll() }
+            } message: {
+                Text(model.store.inCloud
+                     ? "Every finished lesson, your code and your milestones will be forgotten on all your devices. Lessons you made stay. This cannot be undone."
+                     : "Every finished lesson, your code and your milestones will be forgotten. Lessons you made stay. This cannot be undone.")
+            }
     }
 
     @ViewBuilder private var panes: some View {
@@ -94,18 +102,39 @@ struct SettingsView: View {
                  ? "Heavier explanations can use Apple's Private Cloud Compute. Requests stay private to you and count against Apple's daily limit."
                  : "Private Cloud Compute needs Apple's managed entitlement. Until it is granted, every feature runs on this device.")
                 .font(.reading(.caption)).foregroundStyle(.secondary)
+        } header: {
+            Text("Apple Intelligence")
+        } footer: {
+            Text("Your code, errors and topics stay on this device. Nothing is sent to Asteria.")
+        }
+
+        Section {
             Toggle("Share lessons with Siri and Spotlight", isOn: $shareWithSiri)
                 .onChange(of: shareWithSiri) { _, _ in
                     Task { await SpotlightIndex.refresh() }
                 }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Try saying").font(.reading(.caption, weight: .semibold)).foregroundStyle(.secondary)
+                ForEach(["“Continue my Swift course in Swift Zero to Hero”",
+                         "“What's next in Swift Zero to Hero”",
+                         "“How far am I in Swift Zero to Hero”",
+                         "“Show my milestones in Swift Zero to Hero”"], id: \.self) { phrase in
+                    Text(phrase).font(.reading(.callout))
+                }
+            }
+            .padding(.vertical, 2)
+            #if os(iOS)
+            ShortcutsLink()
+            #endif
         } header: {
-            Text("Apple Intelligence")
+            Text("Siri and Shortcuts")
         } footer: {
-            Text("Vocabulary, code and errors stay on this device. Nothing is sent to Asteria.")
+            Text(shareWithSiri ? "Lesson titles are in Spotlight so Siri can open them." : "Lessons are removed from Spotlight. Siri phrases still work.")
         }
 
         Section("Progress") {
             LabeledContent("Lessons done", value: "\(model.doneCount) of \(model.course.lessons.count)")
+            LabeledContent("Exercise checking", value: runnerText)
             LabeledContent("Streak", value: "\(model.store.streak) days")
             LabeledContent("Milestones", value: "\(model.store.badges.count) of \(Achievements.all.count)")
             Button("Start the course again…", role: .destructive) { confirmReset = true }
@@ -117,7 +146,7 @@ struct SettingsView: View {
                 Spacer()
                 Text(version).font(.reading(.caption)).foregroundStyle(.secondary).monospacedDigit()
             }
-            Text("A complete Swift course for iPhone, iPad and Mac. 161 lessons, on-device checking, and no account.")
+            Text("A complete Swift course for iPhone, iPad and Mac. \(model.course.lessons.count) lessons, on-device checking, and no account.")
                 .font(.reading(.callout)).foregroundStyle(.secondary)
             if let privacy = URL(string: "https://learn.asteria.technology/privacy/") {
                 Link("Privacy", destination: privacy)
@@ -129,6 +158,15 @@ struct SettingsView: View {
             Text("About")
         } footer: {
             Text("© 2026 Asteria Technology. Swift and Apple Intelligence are Apple's.")
+        }
+    }
+
+    private var runnerText: String {
+        switch model.runnerState {
+        case .looking: "Looking…"
+        case .ready: "Swift compiler on this Mac"
+        case .device: "On-device engine"
+        case .unavailable: "Unavailable"
         }
     }
 

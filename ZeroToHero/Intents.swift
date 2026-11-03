@@ -8,6 +8,7 @@ import ZeroToHeroKit
 @MainActor
 enum AppRouter {
     static var open: ((String?) -> Void)?
+    static var showMilestones: (() -> Void)?
 }
 
 struct LessonEntity: AppEntity, IndexedEntity {
@@ -39,14 +40,14 @@ struct LessonEntity: AppEntity, IndexedEntity {
 struct LessonQuery: EntityStringQuery {
     func entities(for identifiers: [LessonEntity.ID]) async throws -> [LessonEntity] {
         await MainActor.run {
-            guard let course = try? Course.load() else { return [] }
+            let course = Course.app
             return identifiers.compactMap { id in entity(id, course: course) }
         }
     }
 
     func entities(matching string: String) async throws -> [LessonEntity] {
         await MainActor.run {
-            guard let course = try? Course.load() else { return [] }
+            let course = Course.app
             return course.lessons
                 .filter { $0.title.localizedStandardContains(string) || $0.id.contains(string.lowercased()) }
                 .prefix(20)
@@ -56,7 +57,7 @@ struct LessonQuery: EntityStringQuery {
 
     func suggestedEntities() async throws -> [LessonEntity] {
         await MainActor.run {
-            guard let course = try? Course.load() else { return [] }
+            let course = Course.app
             let store = LearnerStore.shared
             if let next = course.next(after: store.lastLesson, done: { store.isDone($0) }) {
                 return [entity(next.id, course: course)].compactMap { $0 }
@@ -93,7 +94,7 @@ struct ContinueLessonIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let result: (String?, String) = await MainActor.run {
-            guard let course = try? Course.load() else { return (nil, "The course could not be loaded.") }
+            let course = Course.app
             let store = LearnerStore.shared
             guard let next = course.next(after: store.lastLesson, done: { store.isDone($0) }) else {
                 return (nil, "You have finished every lesson. Well done.")
@@ -112,7 +113,7 @@ struct CourseProgressIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<Int> {
         let result: (Int, Int, Int) = await MainActor.run {
-            guard let course = try? Course.load() else { return (0, 0, 0) }
+            let course = Course.app
             let store = LearnerStore.shared
             return (store.count(in: course.lessons), course.lessons.count, store.streak)
         }
@@ -130,13 +131,72 @@ struct NextLessonIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<LessonEntity> {
         let value: LessonEntity? = await MainActor.run {
-            guard let course = try? Course.load() else { return nil }
+            let course = Course.app
             let store = LearnerStore.shared
             guard let next = course.next(after: store.lastLesson, done: { store.isDone($0) }) else { return nil }
             return LessonEntity(next, chapter: course.module(of: next.id)?.chapter.title ?? "", done: false)
         }
         guard let value else { return .result(value: LessonEntity(Lesson.warmUp, chapter: "", done: false), dialog: "You have finished the course.") }
         return .result(value: value, dialog: "Next is \(value.title).")
+    }
+}
+
+/// A milestone, so Siri and Shortcuts can say which ones are earned and open one to share.
+struct AchievementEntity: AppEntity {
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Milestone", numericFormat: "\(placeholder: .int) milestones")
+    static let defaultQuery = AchievementQuery()
+
+    let id: String
+    let title: String
+    let detail: String
+    let symbol: String
+    let earned: Bool
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(title)", subtitle: "\(earned ? "Earned" : "Not yet") · \(detail)", image: .init(systemName: symbol))
+    }
+
+    init(_ badge: Achievement, earned: Bool) {
+        id = badge.id
+        title = badge.title
+        detail = badge.detail
+        symbol = badge.symbol
+        self.earned = earned
+    }
+}
+
+struct AchievementQuery: EnumerableEntityQuery {
+    func allEntities() async throws -> [AchievementEntity] {
+        await MainActor.run {
+            let earned = LearnerStore.shared.badges
+            return Achievements.all.map { AchievementEntity($0, earned: earned.contains($0.id)) }
+        }
+    }
+
+    func entities(for identifiers: [AchievementEntity.ID]) async throws -> [AchievementEntity] {
+        try await allEntities().filter { identifiers.contains($0.id) }
+    }
+
+    func suggestedEntities() async throws -> [AchievementEntity] {
+        try await allEntities().filter(\.earned)
+    }
+}
+
+struct ShowMilestonesIntent: AppIntent {
+    static let title: LocalizedStringResource = "Show My Milestones"
+    static let description = IntentDescription("Opens your milestones, ready to share.")
+    static var supportedModes: IntentModes { .foreground }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<[AchievementEntity]> {
+        let earned: [AchievementEntity] = await MainActor.run {
+            AppRouter.showMilestones?()
+            let ids = LearnerStore.shared.badges
+            return Achievements.all.filter { ids.contains($0.id) }.map { AchievementEntity($0, earned: true) }
+        }
+        let dialog = earned.isEmpty
+            ? "No milestones yet. Finish your first lesson to earn one."
+            : "You have \(earned.count) of \(Achievements.all.count) milestones."
+        return .result(value: earned, dialog: "\(dialog)")
     }
 }
 
@@ -162,6 +222,11 @@ struct ZeroToHeroShortcuts: AppShortcutsProvider {
             "Open \(\.$target) in \(.applicationName)",
             "Open a lesson in \(.applicationName)",
         ], shortTitle: "Open Lesson", systemImageName: "book")
+
+        AppShortcut(intent: ShowMilestonesIntent(), phrases: [
+            "Show my milestones in \(.applicationName)",
+            "My badges in \(.applicationName)",
+        ], shortTitle: "Milestones", systemImageName: "trophy")
     }
 }
 
@@ -169,7 +234,8 @@ struct ZeroToHeroShortcuts: AppShortcutsProvider {
 enum SpotlightIndex {
     static func refresh() async {
         let share = UserDefaults.standard.object(forKey: "shareWithSiri") as? Bool ?? true
-        guard share, let course = try? Course.load() else {
+        let course = Course.app
+        guard share else {
             try? await CSSearchableIndex.default().deleteAllSearchableItems()
             return
         }

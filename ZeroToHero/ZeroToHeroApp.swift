@@ -11,7 +11,8 @@ struct ZeroToHeroApp: App {
 
     init() {
         _ = BrandFont.isRegistered
-        let course = (try? Course.load()) ?? .fallback
+        if Records.cloudKitAllowed { CloudSettings.start() }
+        let course = Course.app
         let store = LearnerStore.shared
         _store = State(initialValue: store)
         _model = State(initialValue: AppModel(course: course, store: store))

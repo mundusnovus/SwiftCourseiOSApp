@@ -12,8 +12,6 @@ enum DeviceSupport {
         struct Payload: Decodable { let runnable: [String] }
         var urls: [URL] = []
         if let bundled = Bundle.main.url(forResource: "device-support", withExtension: "json") { urls.append(bundled) }
-        let dev = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appending(path: "Resources/device-support.json")
-        urls.append(dev)
         for url in urls {
             if let data = try? Data(contentsOf: url), let payload = try? JSONDecoder().decode(Payload.self, from: data) {
                 return Set(payload.runnable)

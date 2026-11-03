@@ -29,8 +29,7 @@ public nonisolated struct ProgressSnapshot: Sendable {
     public var labsDone: Int = 0
     public var streak: Int = 0
     public var chaptersDone: Int = 0
-    public var lessonsInDoneChapters: Int = 0
-    public var totalLessons: Int = 161
+    public var totalLessons: Int = 0
     public var hourOfDay: Int = 12
     public var daysSinceStart: Int = 0
     public var cameBackAfterBreak: Bool = false
