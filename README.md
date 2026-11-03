@@ -38,7 +38,7 @@ tools/archive.sh mac
 tools/screenshots-ios.sh
 ```
 
-Open `ZeroToHero.xcodeproj`, scheme **ZeroToHero**, destination My Mac or an iPhone simulator. The build-5 upload
+Open `ZeroToHero.xcodeproj`, scheme **ZeroToHero**, destination My Mac or an iPhone simulator. The build-6 upload
 checklist is in `RELEASE.md`.
 
 iCloud schema on a signed Mac (once, then deploy to Production in CloudKit Console):
