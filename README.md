@@ -103,6 +103,9 @@ and Siri/Spotlight on hardware are not yet verified.
 Not verified: upload to App Store Connect (yours to do), iCloud sync between two signed devices, Siri phrases and
 Spotlight results on hardware, Private Cloud Compute (entitlement not granted), VoiceOver and Dynamic Type on hardware.
 
+Dynamic Type was checked at AX5 on Home and a lesson: text wraps and the page scrolls. The lesson breadcrumb
+truncates to one line at that size; that is a 2.0.1 polish item, not a blocker.
+
 Spotlight note: on the iOS simulator the app indexed all 173 lessons successfully. On the sandboxed Mac build,
 `CSSearchableIndex` returns `CSIndexErrorDomain -1000` (underlying 4099) for both the lesson index and the App Intents
 metadata; that matches a long-standing macOS App Sandbox/CoreSpotlight issue

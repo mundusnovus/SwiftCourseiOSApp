@@ -64,3 +64,4 @@ and `.pkg` into Transporter. Do not use `tools/archive.sh` again after uploading
 - Two-device iCloud sync and Siri phrases are not verified in this session.
 - Private Cloud Compute is off until Apple grants the entitlement.
 - The app is English only.
+- At AX5 the lesson breadcrumb truncates to one line; the lesson body still wraps and scrolls. Polish for 2.0.1.
