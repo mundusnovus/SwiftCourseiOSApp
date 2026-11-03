@@ -71,7 +71,8 @@ listed in every report until they are done.
 
 1. Raise device coverage from 61 to the last 22: extensions, tuples, Codable, async streams and the enum/associated-value cases.
 2. Test iCloud on two signed devices; run `-initCloudKitSchema` and deploy the schema.
-3. Speak every App Shortcut phrase on a device; check Spotlight results.
+3. Speak every App Shortcut phrase on a device; check Spotlight results. Known: CoreSpotlight donation fails in the
+   sandboxed Mac build with `CSIndexErrorDomain -1000` / 4099, matching radar 37340318; verify on iOS hardware.
 4. VoiceOver, Dynamic Type, contrast, Reduce Motion on hardware.
 5. Archive both platforms, export locally, capture the required screenshot sizes, write the listing, submit.
 6. Request the PCC entitlement; only then turn the Info.plist key on.
