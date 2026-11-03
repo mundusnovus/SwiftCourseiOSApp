@@ -103,11 +103,12 @@ and Siri/Spotlight on hardware are not yet verified.
 Not verified: upload to App Store Connect (yours to do), iCloud sync between two signed devices, Siri phrases and
 Spotlight results on hardware, Private Cloud Compute (entitlement not granted), VoiceOver and Dynamic Type on hardware.
 
-Spotlight note: on the sandboxed Mac build, `CSSearchableIndex` returns `CSIndexErrorDomain -1000` (underlying 4099) for
-both the lesson index and the App Intents metadata. That matches a long-standing macOS App Sandbox/CoreSpotlight issue
+Spotlight note: on the iOS simulator the app indexed all 173 lessons successfully. On the sandboxed Mac build,
+`CSSearchableIndex` returns `CSIndexErrorDomain -1000` (underlying 4099) for both the lesson index and the App Intents
+metadata; that matches a long-standing macOS App Sandbox/CoreSpotlight issue
 ([radar 37340318](https://github.com/PSPDFKit-labs/radar.apple.com/blob/master/37340318%20-%20CoreSpotlight%20Sandbox%20Failure%20macOS/README.md)).
-It is expected to work on iOS, but it is not verified until it is seen on hardware. The 2.0.0 build is unchanged; this
-is a known limitation, not a reason to hold the upload.
+The 2.0.0 build is unchanged; this is a known macOS limitation, not a reason to hold the upload. iOS hardware is still
+the final check.
 
 ## License
 

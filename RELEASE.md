@@ -57,9 +57,10 @@ and `.pkg` into Transporter. Do not use `tools/archive.sh` again after uploading
 ## Known limitations in 2.0.0
 
 - 61 of 83 exercises are checked on device; 18 are explicit Xcode labs. Nothing is silently marked wrong.
-- macOS Spotlight indexing fails with `CSIndexErrorDomain -1000` (4099) in the sandboxed build; this matches
+- Spotlight indexed all 173 lessons on the iOS simulator. On the sandboxed Mac build, CoreSpotlight returns
+  `CSIndexErrorDomain -1000` (4099); this matches
   [radar 37340318](https://github.com/PSPDFKit-labs/radar.apple.com/blob/master/37340318%20-%20CoreSpotlight%20Sandbox%20Failure%20macOS/README.md).
-  iOS is expected to work and needs a device check.
+  iOS hardware is the final check.
 - Two-device iCloud sync and Siri phrases are not verified in this session.
 - Private Cloud Compute is off until Apple grants the entitlement.
 - The app is English only.
