@@ -13,9 +13,12 @@ clone does not contain them.
 Version 2.0.0, build 5. The 1.0.0 uploads used builds 3 and 4, so 5 is valid.
 
 Verified in this package: `codesign --verify --deep --strict` passes for the archived app and the IPA; the Mac pkg is
-signed by the 3rd Party Mac Developer Installer; the privacy manifest declares UserDefaults (`CA92.1`), no tracking and
-no collected data; `Metadata.appintents` contains Continue, What's Next, My Progress and Open Lesson, the indexed
-`LessonEntity`, and all four App Shortcut phrase sets.
+signed by the 3rd Party Mac Developer Installer and its app carries the Production iCloud entitlement; the privacy
+manifest declares UserDefaults (`CA92.1`), no tracking and no collected data; `Metadata.appintents` contains Continue,
+What's Next, My Progress and Open Lesson, the indexed `LessonEntity`, and all four App Shortcut phrase sets.
+
+The distribution-signed Mac app is installed by the App Store/TestFlight. Copying it out of the pkg and launching it
+fails with launchd 163, which is expected; use the pkg or a TestFlight install to test that exact build.
 
 ## Before uploading
 
