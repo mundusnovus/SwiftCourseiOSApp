@@ -69,10 +69,9 @@ language the early and middle course uses. It runs the lesson's existing `expect
 captures `print` output.
 
 The audit in `CoverageTests` checks every shipped solution and writes the list of lessons the engine can check today
-(`ZeroToHero/Resources/device-support.json`). **36 of the 83 exercises are fully checked on device.** The rest open as
+(`ZeroToHero/Resources/device-support.json`). **61 of the 83 exercises are fully checked on device.** The rest open as
 Xcode labs: the lesson, its tests and the starting code are shown, with an honest note that the full compiler needs a
-Mac. That is a deliberate, visible limit, not a hidden failure. Extending the subset (protocols, classes, generics,
-async, Codable) is the next coverage work.
+Mac. That is a deliberate, visible limit, not a hidden failure. Extending the subset (extensions, tuples, Codable and async streams) is the next coverage work.
 
 ## Privacy
 
@@ -82,7 +81,7 @@ in this build. The privacy manifest declares UserDefaults (`CA92.1`) and no trac
 
 ## Status
 
-Verified: both platforms build; the on-device engine passes 36 exercise solutions and the app runs a lesson end to end
+Verified: both platforms build; the on-device engine passes 61 exercise solutions and the app runs a lesson end to end
 on the iPhone 17 simulator; the Mac app launches; the kit has 12 tests.
 
 Not verified in this build: a signed device install, iCloud sync between two devices, Siri phrases on a device,

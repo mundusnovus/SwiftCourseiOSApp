@@ -20,9 +20,11 @@ nonisolated final class DictRef {
 nonisolated final class InstanceRef {
     let typeName: String
     var fields: [String: Value]
-    init(typeName: String, fields: [String: Value]) {
+    let isClass: Bool
+    init(typeName: String, fields: [String: Value], isClass: Bool = false) {
         self.typeName = typeName
         self.fields = fields
+        self.isClass = isClass
     }
 }
 
@@ -103,6 +105,11 @@ nonisolated struct RuntimeError: Error, CustomStringConvertible {
 
 nonisolated struct TimeoutError: Error {}
 
+nonisolated struct ThrownError: Error {
+    let value: Value
+    let line: Int
+}
+
 // MARK: - Interpreter
 
 nonisolated final class Interpreter {
@@ -162,7 +169,7 @@ nonisolated final class Interpreter {
             try tick(line)
             let resolved = try value.map { try copyValue(try evaluate($0)) } ?? defaultValue(for: type, line: line)
             if let type, type.hasPrefix("Set<"), case .array(let array) = resolved { array.isSet = true }
-            scope.define(name, resolved)
+            scope.define(name, coerce(resolved, to: type))
             return .normal
 
         case .expr(let expr):
@@ -189,7 +196,7 @@ nonisolated final class Interpreter {
             if case .normal = flow { throw RuntimeError(message: "A guard’s else block must return or stop.", line: line) }
             return flow
 
-        case .forIn(let name, let sequence, let body, let line):
+        case .forIn(let name, let sequence, let whereClause, let body, let line):
             try tick(line)
             let value = try evaluate(sequence)
             if case .range(let lower, let upper, let closed) = value {
@@ -201,6 +208,7 @@ nonisolated final class Interpreter {
                     let inner = Scope(parent: outer)
                     inner.define(name, .int(n))
                     scope = inner
+                    if let whereClause, try !truth(evaluate(whereClause), line: line) { scope = outer; n += 1; continue }
                     let flow = try runBody(body)
                     scope = outer
                     switch flow {
@@ -225,6 +233,7 @@ nonisolated final class Interpreter {
                 let inner = Scope(parent: outer)
                 inner.define(name, copyValue(item))
                 scope = inner
+                if let whereClause, try !truth(evaluate(whereClause), line: line) { scope = outer; continue }
                 let flow = try runBody(body)
                 scope = outer
                 switch flow {
@@ -271,6 +280,11 @@ nonisolated final class Interpreter {
             globals.define(decl.name, .type(.structure(decl)))
             return .normal
 
+        case .classDecl(let decl):
+            structures[decl.name] = decl
+            globals.define(decl.name, .type(.structure(decl)))
+            return .normal
+
         case .enumDecl(let decl):
             enumerations[decl.name] = decl
             globals.define(decl.name, .type(.enumeration(decl)))
@@ -304,8 +318,32 @@ nonisolated final class Interpreter {
             }
             return .normal
 
-        case .throwStmt(_, let line):
-            throw RuntimeError(message: "This code throws an error, which this device cannot follow. Open it in Xcode.", line: line)
+        case .throwStmt(let expr, let line):
+            throw ThrownError(value: try evaluate(expr), line: line)
+
+        case .doCatch(let body, let catches, _):
+            let outer = scope
+            do {
+                let inner = Scope(parent: outer)
+                scope = inner
+                let flow = try runBody(body)
+                scope = outer
+                return flow
+            } catch let thrown as ThrownError {
+                scope = outer
+                for clause in catches {
+                    let pattern = clause.pattern ?? .wildcard
+                    let (matched, binding) = try match(pattern, thrown.value, line: thrown.line)
+                    guard matched else { continue }
+                    let inner = Scope(parent: outer)
+                    scope = inner
+                    if let binding { inner.define(binding, boundValue(pattern, thrown.value)) }
+                    let flow = try runBody(clause.body)
+                    scope = outer
+                    return flow
+                }
+                throw thrown
+            }
         }
     }
 
@@ -365,8 +403,21 @@ nonisolated final class Interpreter {
             if let value = scope.lookup(name) { return value }
             if let instance = selfStack.last, let field = instance.fields[name] { return field }
             throw RuntimeError(message: "“\(name)” is not defined yet.", line: line)
+        case .keyPath(let name, _):
+            return .function(Function(closure: globals, native: { args, line in
+                try self.member(of: args[0], name: name, line: line)
+            }))
+        case .tryOptional(let inner, _):
+            do { return try evaluate(inner) } catch is ThrownError { return .none }
+        case .tryForced(let inner, let line):
+            do { return try evaluate(inner) } catch is ThrownError {
+                throw RuntimeError(message: "A forced try failed.", line: line)
+            }
         case .selfValue(let line):
             guard let instance = selfStack.last else { throw RuntimeError(message: "self is not available here.", line: line) }
+            return .instance(instance)
+        case .superValue(let line):
+            guard let instance = selfStack.last else { throw RuntimeError(message: "super is not available here.", line: line) }
             return .instance(instance)
         case .array(let items, _): return .array(ArrayRef(try items.map { try evaluate($0) }))
         case .dictionary(let pairs, let line):
@@ -411,7 +462,21 @@ nonisolated final class Interpreter {
             if case .name("print", _) = callee {
                 return try runPrint(args, trailing: trailing, line: line)
             }
-            let function = try evaluate(callee)
+            if case .member(.superValue, "init", _, _) = callee {
+                return try runSuperInit(try args.map { try evaluate($0.value) }, line: line)
+            }
+            if case .member(.name("Task", _), "sleep", _, _) = callee {
+                return .void
+            }
+            if case .member(.selfValue, "init", _, _) = callee {
+                return try runSelfInit(try args.map { try evaluate($0.value) }, labels: args.map(\.label), line: line)
+            }
+            let function: Value
+            if case .name(let calleeName, _) = callee, scope.lookup(calleeName) == nil, let instance = selfStack.last {
+                function = try member(of: .instance(instance), name: calleeName, line: line)
+            } else {
+                function = try evaluate(callee)
+            }
             var values = try args.map { try evaluate($0.value) }
             if let trailing { values.append(.function(Function(params: trailing.params.map { Parameter(label: "_", name: $0, type: nil, defaultValue: nil) }, body: trailing.body, closure: scope))) }
             return try call(function, values, line: line, labels: args.map(\.label))
@@ -438,14 +503,21 @@ nonisolated final class Interpreter {
             switch target {
             case .name(let name, _):
                 let old: Value
-                if op == "=" { old = .void } else {
+                if op == "=" {
+                    old = scope.lookup(name) ?? selfStack.last?.fields[name] ?? .void
+                } else {
                     if let existing = scope.lookup(name) { old = existing }
                     else if let field = selfStack.last?.fields[name] { old = field }
                     else { throw RuntimeError(message: "“\(name)” is not defined yet.", line: line) }
                 }
                 if name == "_" { return .void }
                 let result = op == "=" ? newValue : try binary(String(op.dropLast()), old, newValue, line: line)
-                if scope.set(name, copyValue(result)) { return .void }
+                if scope.set(name, copyValue(result)) {
+                    if case .none = result, case .instance(let released) = old, released.isClass {
+                        if !isReferenced(released, excluding: name) { try runDeinit(released, line: line) }
+                    }
+                    return .void
+                }
                 if let instance = selfStack.last, instance.fields[name] != nil {
                     instance.fields[name] = copyValue(result)
                     return .void
@@ -556,9 +628,12 @@ nonisolated final class Interpreter {
                 local.define(param.name, .array(ArrayRef(rest)))
                 continue
             }
-            if let position = args.indices.first(where: { !used[$0] && (labels[$0] == param.label || param.label == "_" || labels[$0] == nil) }) {
+            if let position = args.indices.first(where: {
+                let label = $0 < labels.count ? labels[$0] : nil
+                return !used[$0] && (label == param.label || param.label == "_" || label == nil)
+            }) {
                 used[position] = true
-                local.define(param.name, copyValue(args[position]))
+                local.define(param.name, coerce(copyValue(args[position]), to: param.type))
             } else if let fallback = param.defaultValue {
                 local.define(param.name, try evaluate(fallback))
             } else {
@@ -619,16 +694,29 @@ nonisolated final class Interpreter {
             return try builtinConstruct(name, args, line: line)
         case .structure(let decl):
             var fields: [String: Value] = [:]
-            for (index, field) in decl.fields.enumerated() {
-                if index < args.count {
-                    fields[field.name] = args[index]
-                } else if let defaultValue = field.defaultValue {
-                    fields[field.name] = try evaluate(defaultValue)
-                } else {
-                    throw RuntimeError(message: "\(decl.name) needs a value for “\(field.name)”.", line: line)
+            var chain: [StructDecl] = []
+            var current: String? = decl.name
+            while let name = current, let item = structures[name] {
+                chain.insert(item, at: 0)
+                current = item.superclass
+            }
+            for item in chain {
+                for field in item.fields {
+                    fields[field.name] = try field.defaultValue.map { coerce(try evaluate($0), to: field.type) } ?? defaultValue(for: field.type, line: line)
                 }
             }
-            return .instance(InstanceRef(typeName: decl.name, fields: fields))
+            if !decl.isClass && decl.initializers.isEmpty {
+                for (index, field) in decl.fields.enumerated() where index < args.count {
+                    fields[field.name] = coerce(args[index], to: field.type)
+                }
+            }
+            let instance = InstanceRef(typeName: decl.name, fields: fields, isClass: decl.isClass)
+            if let initializer = chooseInitializer(decl, labels: labels, count: args.count) {
+                let f = Function(params: initializer.params, body: initializer.body, closure: globals, owner: instance)
+                let flow = try invoke(f, args, line: line, labels: labels)
+                if case .none = flow { return .none }
+            }
+            return .instance(instance)
         case .enumeration(let decl):
             if let first = args.first, case .int(let raw) = first,
                let item = decl.cases.first(where: { $0.rawValue == raw }) {
@@ -684,8 +772,69 @@ nonisolated final class Interpreter {
 
     // MARK: members
 
+    private func valueReferences(_ value: Value, _ instance: InstanceRef) -> Bool {
+        switch value {
+        case .instance(let other): return other === instance
+        case .array(let array): return array.items.contains { valueReferences($0, instance) }
+        case .dictionary(let dictionary): return dictionary.items.values.contains { valueReferences($0, instance) }
+        default: return false
+        }
+    }
+
+    private func isReferenced(_ instance: InstanceRef, excluding name: String) -> Bool {
+        var current: Scope? = scope
+        while let item = current {
+            for (key, value) in item.vars where key != name {
+                if valueReferences(value, instance) { return true }
+            }
+            current = item.parent
+        }
+        return false
+    }
+
+    private func runDeinit(_ instance: InstanceRef, line: Int) throws {
+        var typeName: String? = instance.typeName
+        while let name = typeName, let decl = structures[name] {
+            if !decl.deinitBody.isEmpty {
+                let function = Function(params: [], body: decl.deinitBody, closure: globals, owner: instance)
+                _ = try invoke(function, [], line: line, labels: [])
+                return
+            }
+            typeName = decl.superclass
+        }
+    }
+
+    private func runSelfInit(_ args: [Value], labels: [String?], line: Int) throws -> Value {
+        guard let instance = selfStack.last, let decl = structures[instance.typeName] else { return .void }
+        let initializer = chooseInitializer(decl, labels: labels, count: args.count)
+        guard let initializer else { return .void }
+        let function = Function(params: initializer.params, body: initializer.body, closure: globals, owner: instance)
+        _ = try invoke(function, args, line: line, labels: labels)
+        return .void
+    }
+
+    private func chooseInitializer(_ decl: StructDecl, labels: [String?], count: Int) -> FunctionDecl? {
+        let candidates = decl.initializers.filter { $0.params.count == count }
+        return candidates.first { initializer in
+            zip(initializer.params, labels).allSatisfy { param, label in
+                label == nil || param.label == "_" || param.label == label
+            }
+        } ?? candidates.first ?? decl.initializers.first
+    }
+
+    private func runSuperInit(_ args: [Value], line: Int) throws -> Value {
+        guard let instance = selfStack.last, let decl = structures[instance.typeName],
+              let parent = decl.superclass, let superDecl = structures[parent],
+              let initializer = superDecl.initializers.first else { return .void }
+        let f = Function(params: initializer.params, body: initializer.body, closure: globals, owner: instance)
+        _ = try invoke(f, args, line: line, labels: [])
+        return .void
+    }
+
     private func member(of value: Value, name: String, line: Int) throws -> Value {
-        if name == "flatMap" {
+        if name == "flatMap", case .array = value {
+            // Array.flatMap is handled below; only optionals and other values use the generic form.
+        } else if name == "flatMap" {
             return method(name) { args, l in
                 if case .none = value { return .none }
                 return try self.call(args[0], [value], line: l)
@@ -700,11 +849,25 @@ nonisolated final class Interpreter {
             return try dictionaryMember(d, name, line: line)
         case .instance(let instance):
             if let field = instance.fields[name] { return field }
-            if let decl = structures[instance.typeName], let method = decl.methods.first(where: { $0.name == name }) {
-                return .function(Function(params: method.params, body: method.body, closure: globals, owner: instance))
+            var typeName: String? = instance.typeName
+            while let current = typeName, let decl = structures[current] {
+                if let method = decl.methods.first(where: { $0.name == name }) {
+                    return .function(Function(params: method.params, body: method.body, closure: globals, owner: instance))
+                }
+                if let property = decl.computed.first(where: { $0.name == name }) {
+                    let function = Function(params: [], body: property.body, closure: globals, owner: instance)
+                    return try invoke(function, [], line: line, labels: [])
+                }
+                typeName = decl.superclass
             }
             throw RuntimeError(message: "\(instance.typeName) has no member “\(name)”.", line: line)
         case .type(.structure(let decl)):
+            if let property = decl.staticFields.first(where: { $0.name == name }) {
+                return try property.defaultValue.map { try evaluate($0) } ?? defaultValue(for: property.type, line: line)
+            }
+            if let method = decl.staticMethods.first(where: { $0.name == name }) {
+                return .function(Function(params: method.params, body: method.body, closure: globals))
+            }
             if let method = decl.methods.first(where: { $0.name == name }) {
                 return .function(Function(params: method.params, body: method.body, closure: globals))
             }
@@ -794,7 +957,22 @@ nonisolated final class Interpreter {
         case "%": return try numeric("%", lhs, rhs, line: line)
         case "==": return .bool(valuesEqual(lhs, rhs))
         case "!=": return .bool(!valuesEqual(lhs, rhs))
+        case "===":
+            if case .instance(let a) = lhs, case .instance(let b) = rhs { return .bool(a === b) }
+            return .bool(false)
+        case "!==":
+            if case .instance(let a) = lhs, case .instance(let b) = rhs { return .bool(a !== b) }
+            return .bool(true)
         case "<", ">", "<=", ">=":
+            if case .instance = lhs, case .instance = rhs {
+                let less = try lessThan(lhs, rhs, line: line)
+                switch op {
+                case "<": return .bool(less)
+                case ">": return .bool(try lessThan(rhs, lhs, line: line))
+                case "<=": return .bool(!(try lessThan(rhs, lhs, line: line)))
+                default: return .bool(!less)
+                }
+            }
             if case .string(let a) = lhs, case .string(let b) = rhs {
                 switch op {
                 case "<": return .bool(a < b)
@@ -936,9 +1114,28 @@ nonisolated final class Interpreter {
         switch value {
         case .array(let a): return .array(ArrayRef(a.items.map(copyValue), isSet: a.isSet))
         case .dictionary(let d): return .dictionary(DictRef(d.items.mapValues(copyValue)))
-        case .instance(let i): return .instance(InstanceRef(typeName: i.typeName, fields: i.fields.mapValues(copyValue)))
+        case .instance(let i): return i.isClass ? value : .instance(InstanceRef(typeName: i.typeName, fields: i.fields.mapValues(copyValue)))
         default: return value
         }
+    }
+
+    private func coerce(_ value: Value, to type: String?) -> Value {
+        guard let type else { return value }
+        switch type {
+        case "Double":
+            if case .int(let n) = value { return .double(Double(n)) }
+            if case .string(let text) = value, let d = Double(text) { return .double(d) }
+        case "Int":
+            if case .double(let d) = value { return .int(Int(d)) }
+            if case .string(let text) = value, let n = Int(text) { return .int(n) }
+        case "String":
+            if case .string = value { return value }
+        default:
+            if type.hasPrefix("[Double]"), case .array(let a) = value {
+                return .array(ArrayRef(a.items.map { coerce($0, to: "Double") }))
+            }
+        }
+        return value
     }
 
     private func defaultValue(for type: String?, line: Int) -> Value {
@@ -966,6 +1163,11 @@ nonisolated final class Interpreter {
         switch name {
         case "count": return .int(s.count)
         case "isEmpty": return .bool(s.isEmpty)
+        case "isNumber": return .bool(s.count == 1 && s.first?.isNumber == true)
+        case "isLetter": return .bool(s.count == 1 && s.first?.isLetter == true)
+        case "isUppercase": return .bool(s.count == 1 && s == s.uppercased() && s != s.lowercased())
+        case "isLowercase": return .bool(s.count == 1 && s == s.lowercased() && s != s.uppercased())
+        case "isWhitespace": return .bool(s.count == 1 && s.first?.isWhitespace == true)
         case "first": return s.first.map { .string(String($0)) } ?? .none
         case "last": return s.last.map { .string(String($0)) } ?? .none
         case "uppercased": return method(name) { _, _ in .string(s.uppercased()) }
@@ -995,6 +1197,14 @@ nonisolated final class Interpreter {
                 let f = args[0]
                 return .array(ArrayRef(try s.map { try self.call(f, [.string(String($0))], line: l) }))
             }
+        case "allSatisfy":
+            return method(name) { args, l in
+                let f = args[0]
+                for character in s {
+                    if try !self.truth(self.call(f, [.string(String(character))], line: l), line: l) { return .bool(false) }
+                }
+                return .bool(true)
+            }
         case "compactMap":
             return method(name) { args, l in
                 let f = args[0]
@@ -1021,14 +1231,52 @@ nonisolated final class Interpreter {
         case "isEmpty": return .bool(a.items.isEmpty)
         case "first": return a.items.first ?? .none
         case "last": return a.items.last ?? .none
-        case "max": return method(name) { _, _ in a.items.max { self.compare($0, $1) < 0 } ?? .none }
-        case "min": return method(name) { _, _ in a.items.min { self.compare($0, $1) < 0 } ?? .none }
+        case "max":
+            return method(name) { args, l in
+                if let f = args.first {
+                    var best: Value?
+                    for item in a.items {
+                        guard let current = best else { best = item; continue }
+                        if try self.truth(self.call(f, [current, item], line: l), line: l) { best = item }
+                    }
+                    return best ?? .none
+                }
+                var best: Value?
+                for item in a.items {
+                    if let current = best, try self.lessThan(current, item, line: l) { best = item }
+                    else if best == nil { best = item }
+                }
+                return best ?? .none
+            }
+        case "min":
+            return method(name) { args, l in
+                if let f = args.first {
+                    var best: Value?
+                    for item in a.items {
+                        guard let current = best else { best = item; continue }
+                        if try self.truth(self.call(f, [item, current], line: l), line: l) { best = item }
+                    }
+                    return best ?? .none
+                }
+                var best: Value?
+                for item in a.items {
+                    if let current = best, try self.lessThan(item, current, line: l) { best = item }
+                    else if best == nil { best = item }
+                }
+                return best ?? .none
+            }
         case "append": return method(name) { args, l in a.items.append(try self.copyValue(args[0])); return .void }
         case "insert":
             return method(name) { args, l in
+                guard let first = args.first else { return .void }
+                if args.count == 1 {
+                    if a.isSet, a.items.contains(where: { self.valuesEqual($0, first) }) { return .void }
+                    a.items.append(try self.copyValue(first))
+                    return .void
+                }
                 let index = try self.intValue(args[1], line: l)
                 guard index >= 0, index <= a.items.count else { throw RuntimeError(message: "Index out of range.", line: l) }
-                a.items.insert(try self.copyValue(args[0]), at: index)
+                a.items.insert(try self.copyValue(first), at: index)
                 return .void
             }
         case "remove":
@@ -1041,6 +1289,11 @@ nonisolated final class Interpreter {
             return method(name) { _, l in
                 guard !a.items.isEmpty else { throw RuntimeError(message: "There is nothing to remove.", line: l) }
                 return a.items.removeLast()
+            }
+        case "removeFirst":
+            return method(name) { _, l in
+                guard !a.items.isEmpty else { throw RuntimeError(message: "There is nothing to remove.", line: l) }
+                return a.items.removeFirst()
             }
         case "contains":
             return method(name) { args, _ in .bool(a.items.contains { self.valuesEqual($0, args[0]) }) }
@@ -1095,7 +1348,7 @@ nonisolated final class Interpreter {
         case "sorted":
             return method(name) { args, l in
                 if args.isEmpty {
-                    return .array(ArrayRef(a.items.sorted { self.compare($0, $1) < 0 }))
+                    return .array(ArrayRef(try a.items.sorted { try self.lessThan($0, $1, line: l) }))
                 }
                 let f = args[0]
                 let sorted = try a.items.sorted { lhs, rhs in
@@ -1189,6 +1442,21 @@ nonisolated final class Interpreter {
         default:
             throw RuntimeError(message: "A dictionary has no member “\(name)” here.", line: line)
         }
+    }
+
+    private func lessThan(_ a: Value, _ b: Value, line: Int) throws -> Bool {
+        if case .instance(let x) = a, case .instance(let y) = b {
+            var typeName: String? = x.typeName
+            while let name = typeName, let decl = structures[name] {
+                if let method = decl.staticMethods.first(where: { $0.name == "<" }) {
+                    let function = Function(params: method.params, body: method.body, closure: globals)
+                    let value = try invoke(function, [a, b], line: line, labels: [])
+                    return try truth(value, line: line)
+                }
+                typeName = decl.superclass
+            }
+        }
+        return compare(a, b) < 0
     }
 
     private func compare(_ a: Value, _ b: Value) -> Int {

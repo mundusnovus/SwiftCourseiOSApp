@@ -42,7 +42,7 @@ nonisolated enum Keywords {
         "extension fallthrough false fileprivate final for func get guard if import in indirect init inout internal is " +
         "isolated lazy let mutating nil nonisolated open operator optional override private protocol public repeat " +
         "required rethrows return self Self set some static struct subscript super switch throw throws true try " +
-        "typealias var weak where while willSet"
+        "typealias var weak where while willSet didSet get set"
     ).split(separator: " ").map(String.init))
 }
 
@@ -255,6 +255,10 @@ nonisolated indirect enum Expr {
     case closure(ClosureValue, line: Int)
     case range(Expr, Expr, closed: Bool, line: Int)
     case selfValue(line: Int)
+    case superValue(line: Int)
+    case tryOptional(Expr, line: Int)
+    case tryForced(Expr, line: Int)
+    case keyPath(String, line: Int)
     case interpolated(String, line: Int)
     case opFunction(String, line: Int)
 
@@ -264,7 +268,8 @@ nonisolated indirect enum Expr {
              .array(_, let l), .dictionary(_, let l), .unary(_, _, let l), .binary(_, _, _, let l),
              .ternary(_, _, _, let l), .call(_, _, _, let l), .member(_, _, _, let l), .index(_, _, let l),
              .force(_, let l), .assign(_, _, _, let l), .closure(_, let l), .range(_, _, _, let l),
-             .selfValue(let l), .interpolated(_, let l), .opFunction(_, let l):
+             .selfValue(let l), .superValue(let l), .tryOptional(_, let l), .tryForced(_, let l), .keyPath(_, let l),
+             .interpolated(_, let l), .opFunction(_, let l):
             l
         }
     }
@@ -286,17 +291,19 @@ nonisolated indirect enum Stmt {
     case expr(Expr)
     case ifStmt([Condition], [Stmt], [Stmt]?, line: Int)
     case guardStmt([Condition], [Stmt], line: Int)
-    case forIn(name: String, sequence: Expr, body: [Stmt], line: Int)
+    case forIn(name: String, sequence: Expr, whereClause: Expr?, body: [Stmt], line: Int)
     case whileStmt(Expr, [Stmt], line: Int)
     case repeatWhile([Stmt], Expr, line: Int)
     case function(FunctionDecl)
     case structDecl(StructDecl)
+    case classDecl(StructDecl)
     case enumDecl(EnumDecl)
     case returnStmt(Expr?, line: Int)
     case breakStmt(line: Int)
     case continueStmt(line: Int)
     case switchStmt(Expr, [SwitchCase], line: Int)
     case throwStmt(Expr, line: Int)
+    case doCatch([Stmt], [CatchClause], line: Int)
 }
 
 nonisolated enum Condition {
@@ -322,8 +329,21 @@ nonisolated struct Parameter {
 
 nonisolated struct StructDecl {
     let name: String
-    let fields: [Field]
-    let methods: [FunctionDecl]
+    var fields: [Field]
+    var methods: [FunctionDecl]
+    var computed: [ComputedProperty] = []
+    var initializers: [FunctionDecl] = []
+    var staticFields: [Field] = []
+    var staticMethods: [FunctionDecl] = []
+    var deinitBody: [Stmt] = []
+    var superclass: String? = nil
+    var isClass = false
+    let line: Int
+}
+
+nonisolated struct ComputedProperty {
+    let name: String
+    let body: [Stmt]
     let line: Int
 }
 
@@ -344,6 +364,11 @@ nonisolated struct EnumCase {
     let name: String
     let payload: [String]
     var rawValue: Int? = nil
+}
+
+nonisolated struct CatchClause {
+    let pattern: Pattern?
+    let body: [Stmt]
 }
 
 nonisolated struct SwitchCase {

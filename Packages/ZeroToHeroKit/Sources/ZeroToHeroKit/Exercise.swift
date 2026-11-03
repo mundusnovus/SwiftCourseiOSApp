@@ -95,7 +95,7 @@ public nonisolated struct OnDeviceRunner: CodeRunner {
                 result.timedOut = true
             } else {
                 result.crashed = true
-                result.crashReason = error.message
+                result.crashReason = error.description
             }
         } catch {
             result.crashed = true

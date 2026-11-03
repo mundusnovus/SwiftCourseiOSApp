@@ -33,7 +33,7 @@ Version 2.0 of Swift: Zero to Hero for Mac and iOS, from the owner's seven point
 - Apple Intelligence: code coach, recap, mini-lesson, study plan. On device; PCC gated.
 - App Intents, App Shortcuts, Spotlight, Handoff.
 - 24 achievements, pure rules, 1080×1350 share card.
-- 173 lessons, 10 chapters, 83 exercises, 82 quizzes. 36 exercises checked on device; the rest are explicit Xcode
+- 173 lessons, 10 chapters, 83 exercises, 82 quizzes. 61 exercises checked on device; the rest are explicit Xcode
   labs with the tests and starting code shown.
 
 ## The acceptance bar
@@ -61,7 +61,7 @@ until they are done.
 
 ## Next
 
-1. Raise device coverage from 36 to the whole first two thirds: protocols, classes, generics, typed throws.
+1. Raise device coverage from 61 to the last 22: extensions, tuples, Codable, async streams and the enum/associated-value cases.
 2. Test iCloud on two signed devices; run `-initCloudKitSchema` and deploy the schema.
 3. Speak every App Shortcut phrase on a device; check Spotlight results.
 4. VoiceOver, Dynamic Type, contrast, Reduce Motion on hardware.

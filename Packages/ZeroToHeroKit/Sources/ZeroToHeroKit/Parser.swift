@@ -93,12 +93,26 @@ nonisolated struct Parser {
 
     private mutating func statement() throws -> Stmt {
         skipNewlines()
+        if current.isSymbol("@") {
+            advance()
+            if current.kind == .name || current.kind == .keyword { advance() }
+            if current.isSymbol("(") {
+                var depth = 0
+                repeat {
+                    if current.isSymbol("(") { depth += 1 }
+                    if current.isSymbol(")") { depth -= 1 }
+                    advance()
+                } while depth > 0 && current.kind != .eof
+            }
+            return try statement()
+        }
         let token = current
         if token.kind == .keyword {
             switch token.text {
             case "let", "var": return try variableDeclaration()
             case "func": return .function(try functionDeclaration())
-            case "struct": return .structDecl(try structDeclaration())
+            case "struct": return .structDecl(try typeDeclaration(isClass: false))
+            case "class": return .classDecl(try typeDeclaration(isClass: true))
             case "enum": return .enumDecl(try enumDeclaration())
             case "if": return try ifStatement()
             case "guard": return try guardStatement()
@@ -122,12 +136,21 @@ nonisolated struct Parser {
             case "break": advance(); return .breakStmt(line: token.line)
             case "continue": advance(); return .continueStmt(line: token.line)
             case "throw": advance(); return .throwStmt(try expression(), line: token.line)
+            case "do": return try doCatchStatement()
+            case "async":
+                advance()
+                if current.isKeyword("let") { return try variableDeclaration() }
+                throw error("Only async let is supported at the start of a statement here.", unsupported: true)
+            case "nonisolated": advance(); return try statement()
+            case "await": advance(); return try statement()
             case "import":
                 // import Foundation, import SwiftUI: no meaning in the sandbox.
                 advance()
                 while current.kind == .name || current.isSymbol(".") { advance() }
                 return .expr(.none(line: token.line))
-            case "class", "protocol", "extension", "actor", "typealias":
+            case "protocol":
+                return try skipBracedDeclaration()
+            case "extension", "actor", "typealias":
                 throw error("\(token.text) is not supported on this device. Open this lesson in Xcode.", unsupported: true)
             case "private", "public", "internal", "fileprivate", "static", "mutating", "nonmutating", "final", "override", "required", "lazy", "weak", "unowned", "indirect", "convenience":
                 advance()
@@ -136,15 +159,80 @@ nonisolated struct Parser {
                 throw error("A custom init is not supported here. Open this lesson in Xcode.", unsupported: true)
             case "defer":
                 throw error("defer is not supported on this device. Open this lesson in Xcode.", unsupported: true)
-            case "do", "try", "catch":
-                throw error("Error handling is not supported on this device. Open this lesson in Xcode.", unsupported: true)
-            case "async", "await":
-                throw error("Concurrency is not supported on this device. Open this lesson in Xcode.", unsupported: true)
             default:
                 break
             }
         }
         return .expr(try expression())
+    }
+
+    /// A protocol declares requirements only; the engine needs the declaration gone, not its contents.
+    private mutating func skipBracedDeclaration() throws -> Stmt {
+        advance()   // protocol
+        if current.kind == .name { advance() }
+        var depth = 0
+        while current.kind != .eof {
+            if current.isSymbol("{") { depth += 1 }
+            if current.isSymbol("}") { depth -= 1 }
+            advance()
+            if depth == 0 && index > 0 { break }
+        }
+        return .expr(.none(line: current.line))
+    }
+
+    private mutating func doCatchStatement() throws -> Stmt {
+        let keyword = advance()
+        let body = try block()
+        var catches: [CatchClause] = []
+        skipNewlines()
+        while current.isKeyword("catch") {
+            advance()
+            var pattern: Pattern?
+            if !current.isSymbol("{") {
+                if current.isSymbol(".") || current.kind == .name {
+                    pattern = try catchPattern()
+                } else if current.isKeyword("let") {
+                    pattern = try self.pattern()
+                }
+            }
+            let catchBody = try block()
+            catches.append(CatchClause(pattern: pattern, body: catchBody))
+            skipNewlines()
+        }
+        return .doCatch(body, catches, line: keyword.line)
+    }
+
+    private mutating func catchPattern() throws -> Pattern {
+        if current.isKeyword("let") { return try pattern() }
+        if current.isSymbol("."), next.kind == .name {
+            advance()
+            let name = advance().text
+            var binding: String?
+            if current.isSymbol("(") {
+                advance()
+                if current.isKeyword("let") { advance() }
+                if current.kind == .name { binding = advance().text }
+                try expect(")", "Expected ) after the error case.")
+            }
+            return .enumCase(name, binding: binding)
+        }
+        // A type name such as TicketError.soldOut.
+        if current.kind == .name {
+            _ = advance()
+            if current.isSymbol(".") { advance() }
+            if current.kind == .name {
+                let name = advance().text
+                var binding: String?
+                if current.isSymbol("(") {
+                    advance()
+                    if current.isKeyword("let") { advance() }
+                    if current.kind == .name { binding = advance().text }
+                    try expect(")", "Expected ) after the error case.")
+                }
+                return .enumCase(name, binding: binding)
+            }
+        }
+        return .wildcard
     }
 
     private mutating func variableDeclaration() throws -> Stmt {
@@ -160,8 +248,12 @@ nonisolated struct Parser {
 
     private mutating func functionDeclaration() throws -> FunctionDecl {
         let keyword = advance()
-        let name = try expect(name: "Expected a function name.").text
-        if current.isSymbol("<") {
+        let nameToken: Token
+        if current.kind == .name { nameToken = advance() }
+        else if current.kind == .symbol, ["<", ">", "==", "+", "-", "*", "/"].contains(current.text) { nameToken = advance() }
+        else { throw error("Expected a function name.") }
+        let name = nameToken.text
+        if current.isSymbol("<") && nameToken.kind == .name {
             var depth = 0
             repeat {
                 if current.isSymbol("<") { depth += 1 }
@@ -170,6 +262,18 @@ nonisolated struct Parser {
             } while depth > 0 && current.kind != .eof
         }
         let params = try parameterList()
+        if current.isKeyword("async") { advance() }
+        if current.isKeyword("throws") {
+            advance()
+            if current.isSymbol("(") {
+                var depth = 0
+                repeat {
+                    if current.isSymbol("(") { depth += 1 }
+                    if current.isSymbol(")") { depth -= 1 }
+                    advance()
+                } while depth > 0 && current.kind != .eof
+            }
+        }
         var returnType: String?
         if match("->") { returnType = try typeName() }
         let body = try block()
@@ -181,10 +285,11 @@ nonisolated struct Parser {
         var params: [Parameter] = []
         skipNewlines()
         while !current.isSymbol(")") {
-            let first = try expect(name: "Expected a parameter name.")
+            guard current.kind == .name || current.kind == .keyword else { throw error("Expected a parameter name.") }
+            let first = advance()
             var label = first.text
             var name = first.text
-            if current.kind == .name {
+            if current.kind == .name || current.kind == .keyword {
                 label = first.text
                 name = advance().text
             }
@@ -227,7 +332,8 @@ nonisolated struct Parser {
                 if t.isSymbol("=") || t.isSymbol(",") || t.isSymbol("{") || t.isSymbol("}") || t.isSymbol(";") { break }
             }
             if t.kind == .name || t.kind == .keyword || t.isSymbol(".") || t.isSymbol(":") || t.isSymbol("?") ||
-                t.isSymbol("<") || t.isSymbol(">") || t.isSymbol("&") || t.isSymbol("(") {
+                t.isSymbol("<") || t.isSymbol(">") || t.isSymbol("&") || t.isSymbol("(") ||
+                (t.isSymbol(",") && parens > 0) {
                 text += advance().text
                 continue
             }
@@ -236,15 +342,56 @@ nonisolated struct Parser {
         return text
     }
 
-    private mutating func structDeclaration() throws -> StructDecl {
+    private mutating func typeDeclaration(isClass: Bool) throws -> StructDecl {
         let keyword = advance()
-        let name = try expect(name: "Expected a struct name.").text
-        if match(":") { while !current.isSymbol("{") && current.kind != .eof { advance() } }
-        try expect("{", "Expected { after the struct name.")
+        let name = try expect(name: "Expected a type name.").text
+        if current.isSymbol("<") {
+            var depth = 0
+            repeat {
+                if current.isSymbol("<") { depth += 1 }
+                if current.isSymbol(">") { depth -= 1 }
+                advance()
+            } while depth > 0 && current.kind != .eof
+        }
+        var superclass: String?
+        if match(":") {
+            var first = true
+            while !current.isSymbol("{") && current.kind != .eof {
+                if current.kind == .name && first && isClass { superclass = current.text; first = false }
+                advance()
+            }
+        }
+        try expect("{", "Expected { after the type name.")
         var fields: [Field] = []
         var methods: [FunctionDecl] = []
+        var computed: [ComputedProperty] = []
+        var initializers: [FunctionDecl] = []
+        var staticFields: [Field] = []
+        var staticMethods: [FunctionDecl] = []
+        var deinitBody: [Stmt] = []
         skipSeparators()
         while !current.isSymbol("}") && current.kind != .eof {
+            if current.isSymbol("@") {
+                advance()
+                if current.kind == .name || current.kind == .keyword { advance() }
+                if current.isSymbol("(") {
+                    var depth = 0
+                    repeat {
+                        if current.isSymbol("(") { depth += 1 }
+                        if current.isSymbol(")") { depth -= 1 }
+                        advance()
+                    } while depth > 0 && current.kind != .eof
+                }
+            }
+            var isStatic = false
+            while current.isKeyword("static") || current.isKeyword("final") || current.isKeyword("private") ||
+                    current.isKeyword("public") || current.isKeyword("fileprivate") || current.isKeyword("internal") ||
+                    current.isKeyword("mutating") || current.isKeyword("nonmutating") || current.isKeyword("override") ||
+                    current.isKeyword("required") || current.isKeyword("convenience") || current.isKeyword("nonisolated") ||
+                    current.isKeyword("weak") || current.isKeyword("unowned") || current.isKeyword("lazy") {
+                if current.isKeyword("static") { isStatic = true }
+                advance()
+            }
             if current.isKeyword("let") || current.isKeyword("var") {
                 let fieldKeyword = advance()
                 let fieldName = try expect(name: "Expected a property name.").text
@@ -252,24 +399,55 @@ nonisolated struct Parser {
                 var value: Expr?
                 if match(":") { type = try typeName() }
                 if match("=") { value = try expression() }
-                if type.isEmpty && value == nil { throw error("A stored property needs a type or a value.") }
-                fields.append(Field(name: fieldName, type: type, defaultValue: value, mutable: fieldKeyword.text == "var"))
+                if current.isSymbol("{") {
+                    let savedIndex = index
+                    advance()
+                    skipNewlines()
+                    let observes = current.isKeyword("didSet") || current.isKeyword("willSet")
+                    index = savedIndex
+                    if observes {
+                        advance()
+                        skipNewlines()
+                        while current.isKeyword("didSet") || current.isKeyword("willSet") {
+                            advance()
+                            _ = try block()
+                            skipNewlines()
+                        }
+                        try expect("}", "Expected } after the property observers.")
+                        let field = Field(name: fieldName, type: type, defaultValue: value, mutable: fieldKeyword.text == "var")
+                        if isStatic { staticFields.append(field) } else { fields.append(field) }
+                    } else {
+                        let body = try block()
+                        computed.append(ComputedProperty(name: fieldName, body: body, line: fieldKeyword.line))
+                    }
+                } else {
+                    if type.isEmpty && value == nil { throw error("A stored property needs a type or a value.") }
+                    let field = Field(name: fieldName, type: type, defaultValue: value, mutable: fieldKeyword.text == "var")
+                    if isStatic { staticFields.append(field) } else { fields.append(field) }
+                }
             } else if current.isKeyword("func") {
-                methods.append(try functionDeclaration())
+                let method = try functionDeclaration()
+                if isStatic { staticMethods.append(method) } else { methods.append(method) }
             } else if current.isKeyword("init") {
-                throw error("A custom init is not supported here. Open this lesson in Xcode.", unsupported: true)
-            } else if current.isKeyword("static") {
-                throw error("Static members are not supported on this device. Open this lesson in Xcode.", unsupported: true)
-            } else if current.isKeyword("private") || current.isKeyword("public") || current.isKeyword("mutating") {
+                let initKeyword = advance()
+                if current.isSymbol("?") || current.isSymbol("!") { advance() }
+                let params = try parameterList()
+                let body = try block()
+                initializers.append(FunctionDecl(name: "init", params: params, returnType: nil, body: body, line: initKeyword.line))
+            } else if current.isKeyword("deinit") {
                 advance()
-                continue
+                deinitBody = try block()
+            } else if current.isKeyword("subscript") {
+                throw error("A subscript is not supported here. Open this lesson in Xcode.", unsupported: true)
             } else {
-                throw error("Only stored properties and methods are supported in a struct here.", unsupported: true)
+                throw error("Only properties, methods, init and deinit are supported in a type here.", unsupported: true)
             }
             skipSeparators()
         }
-        try expect("}", "Expected } to close the struct.")
-        return StructDecl(name: name, fields: fields, methods: methods, line: keyword.line)
+        try expect("}", "Expected } to close the type.")
+        return StructDecl(name: name, fields: fields, methods: methods, computed: computed, initializers: initializers,
+                          staticFields: staticFields, staticMethods: staticMethods, deinitBody: deinitBody,
+                          superclass: superclass, isClass: isClass, line: keyword.line)
     }
 
     private mutating func enumDeclaration() throws -> EnumDecl {
@@ -362,10 +540,10 @@ nonisolated struct Parser {
             if current.isKeyword("let"), next.kind == .name {
                 let line = advance().line
                 let name = advance().text
-                let value: Expr = match("=") ? try expression() : .name(name, line: line)
+                let value: Expr = match("=") ? try controlExpression() : .name(name, line: line)
                 out.append(.optionalBinding(name: name, value: value, line: line))
             } else {
-                out.append(.expression(try expression()))
+                out.append(.expression(try controlExpression()))
             }
             if !match(",") { break }
         }
@@ -381,15 +559,16 @@ nonisolated struct Parser {
 
     private mutating func forStatement() throws -> Stmt {
         let keyword = advance()
-        if current.isKeyword("try") || current.isKeyword("await") {
-            throw error("Only a plain for-in loop is supported here.", unsupported: true)
-        }
+        if current.isKeyword("await") { advance() }
+        if current.isKeyword("try") { throw error("Only a plain for-in loop is supported here.", unsupported: true) }
         let name = try expect(name: "Expected a loop variable.").text
         guard current.isKeyword("in") else { throw error("Expected in after the loop variable.") }
         advance()
         let sequence = try controlExpression()
+        var whereClause: Expr?
+        if current.isKeyword("where") { advance(); whereClause = try controlExpression() }
         let body = try block()
-        return .forIn(name: name, sequence: sequence, body: body, line: keyword.line)
+        return .forIn(name: name, sequence: sequence, whereClause: whereClause, body: body, line: keyword.line)
     }
 
     private mutating func whileStatement() throws -> Stmt {
@@ -480,7 +659,7 @@ nonisolated struct Parser {
     private static let precedence: [String: Int] = [
         "=": 0, "+=": 0, "-=": 0, "*=": 0, "/=": 0, "%=": 0,
         "??": 1, "||": 2, "&&": 3,
-        "==": 4, "!=": 4, "<": 4, ">": 4, "<=": 4, ">=": 4,
+        "==": 4, "!=": 4, "<": 4, ">": 4, "<=": 4, ">=": 4, "===": 4, "!==": 4,
         "...": 5, "..<": 5,
         "+": 6, "-": 6,
         "*": 7, "/": 7, "%": 7,
@@ -530,7 +709,13 @@ nonisolated struct Parser {
             advance()
             return .unary(token.text, try unary(), line: token.line)
         }
-        if token.isKeyword("try") || token.isKeyword("await") || token.isKeyword("some") || token.isKeyword("any") {
+        if token.isKeyword("try") {
+            advance()
+            if current.isSymbol("?") { advance(); return .tryOptional(try unary(), line: token.line) }
+            if current.isSymbol("!") { advance(); return .tryForced(try unary(), line: token.line) }
+            return try unary()
+        }
+        if token.isKeyword("await") || token.isKeyword("some") || token.isKeyword("any") {
             advance()
             return try unary()
         }
@@ -541,7 +726,6 @@ nonisolated struct Parser {
         if token.isKeyword("true") { advance(); return .bool(true, line: token.line) }
         if token.isKeyword("false") { advance(); return .bool(false, line: token.line) }
         if token.isKeyword("nil") { advance(); return .none(line: token.line) }
-        if token.isKeyword("self") { advance(); return .selfValue(line: token.line) }
         return try postfix()
     }
 
@@ -600,11 +784,15 @@ nonisolated struct Parser {
         skipNewlines()
         while !current.isSymbol(")") {
             var label: String?
-            if (current.kind == .name || current.isName("_")), next.isSymbol(":") {
+            if (current.kind == .name || current.kind == .keyword || current.isName("_")), next.isSymbol(":") {
                 label = advance().text
                 advance()
             }
-            if current.kind == .symbol, ["+", "-", "*", "/", "%", "<", ">", "==", "&&", "||"].contains(current.text),
+            if current.isSymbol("\\"), next.isSymbol(".") {
+                advance(); advance()
+                let name = try expect(name: "Expected a property name after \\.",)
+                args.append(Argument(label: label, value: .keyPath(name.text, line: current.line)))
+            } else if current.kind == .symbol, ["+", "-", "*", "/", "%", "<", ">", "==", "&&", "||"].contains(current.text),
                next.isSymbol(",") || next.isSymbol(")") {
                 args.append(Argument(label: label, value: .opFunction(advance().text, line: current.line)))
             } else {
@@ -646,6 +834,7 @@ nonisolated struct Parser {
             case "false": advance(); return .bool(false, line: token.line)
             case "nil": advance(); return .none(line: token.line)
             case "self": advance(); return .selfValue(line: token.line)
+            case "super": advance(); return .superValue(line: token.line)
             default:
                 throw error("\(token.text) is not supported in an expression here.", unsupported: true)
             }

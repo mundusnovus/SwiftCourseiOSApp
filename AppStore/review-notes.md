@@ -47,7 +47,7 @@ tracked data. Progress and code are the person's own, in their private iCloud if
 
 ## Known limits in this build
 
-- 36 of 83 exercises are checked fully on device; the rest are explicit Xcode labs. Nothing is silently marked wrong.
+- 61 of 83 exercises are checked fully on device; the rest are explicit Xcode labs. Nothing is silently marked wrong.
 - Private Cloud Compute is off until Apple grants the entitlement.
 - iCloud sync is not verified on two devices in this build.
 

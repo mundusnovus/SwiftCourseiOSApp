@@ -60,7 +60,7 @@ struct EngineTests {
     }
 
     @Test func unsupportedCodeSaysSo() async throws {
-        let result = try await OnDeviceRunner().check(lesson(code: ""), code: "class A {}")
+        let result = try await OnDeviceRunner().check(lesson(code: ""), code: "actor A {}")
         #expect(result.unsupported)
     }
 
@@ -89,9 +89,11 @@ struct CoverageTests {
         var broken: [(String, String)] = []
         for lesson in course.lessons where lesson.hasCode {
             guard let solution = solutions[lesson.id] else { continue }
+            print("CHECK \(lesson.id)")
             let result = try await runner.check(lesson, code: solution)
             if result.unsupported || !result.compiled {
-                labs.append("\(lesson.id) [\(result.errors.first?.message ?? "?")]")
+                let first = result.errors.first
+                labs.append("\(lesson.id) [\(first?.message ?? "?") line \(first?.line.map(String.init) ?? "-")]")
             } else if result.passed {
                 runnable.append(lesson.id)
             } else {
@@ -206,3 +208,4 @@ struct CaptureTests {
         print("ALL =", i.display(try i.evaluate(try Parser.parseExpression("Weekday.allCases.count"))))
     }
 }
+
