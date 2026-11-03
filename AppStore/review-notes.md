@@ -56,4 +56,4 @@ tracked data. Progress and code are the person's own, in their private iCloud if
 
 ## Contact
 
-Asteria Technology, team KZFR2T5L2A. Support: https://asteria.technology/support/
+Asteria Technology, team KZFR2T5L2A. Support: https://learn.asteria.technology/support/

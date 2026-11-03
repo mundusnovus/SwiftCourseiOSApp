@@ -119,10 +119,10 @@ struct SettingsView: View {
             }
             Text("A complete Swift course for iPhone, iPad and Mac. 161 lessons, on-device checking, and no account.")
                 .font(.reading(.callout)).foregroundStyle(.secondary)
-            if let privacy = URL(string: "https://asteria.technology/privacy/") {
+            if let privacy = URL(string: "https://learn.asteria.technology/privacy/") {
                 Link("Privacy", destination: privacy)
             }
-            if let license = URL(string: "https://asteria.technology/license/") {
+            if let license = URL(string: "https://learn.asteria.technology/license/") {
                 Link("Asteria License", destination: license)
             }
         } header: {

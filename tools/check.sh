@@ -20,7 +20,9 @@ grep -q 'MACOSX_DEPLOYMENT_TARGET = 27.0;' ZeroToHero.xcodeproj/project.pbxproj 
 ! grep -Rq 'executableTarget' Packages/ZeroToHeroKit/Package.swift || fail "no executable target next to the app"
 
 echo "3. Serverless"
-! grep -Rq 'learn\.asteria\.technology' ZeroToHero Packages || fail "a server endpoint is still referenced"
+# Web links (privacy, license) are fine; a network call is not. Apple's own services go through their frameworks.
+! grep -RqE 'URLSession|URLRequest|NWConnection' --include='*.swift' ZeroToHero Packages || fail "the app makes a network call"
+! grep -RqE 'learn\.asteria\.technology/(api|run|compile)' ZeroToHero Packages || fail "a server endpoint is still referenced"
 ! grep -Rq 'RemoteRunner' ZeroToHero Packages || fail "RemoteRunner still exists"
 [ ! -f ZeroToHero/Resources/solutions.json ] || fail "solutions must not ship in the app"
 

@@ -1,6 +1,6 @@
 # Release 2.0.0 — upload checklist
 
-Everything below is for build **5**. The archives are on this Mac under `build/archive/` and are git-ignored; a fresh
+Everything below is for build **6**. The archives are on this Mac under `build/archive/` and are git-ignored; a fresh
 clone does not contain them.
 
 ## Artifacts
@@ -10,7 +10,7 @@ clone does not contain them.
 | iPhone / iPad | `build/archive/ios/export/Swift Zero to Hero.ipa` | Apple Distribution, production iCloud, `get-task-allow` false |
 | Mac | `build/archive/mac/export/Swift Zero to Hero.pkg` | 3rd Party Mac Developer Installer, sandboxed, hardened runtime |
 
-Version 2.0.0, build 5. The 1.0.0 uploads used builds 3 and 4, so 5 is valid.
+Version 2.0.0, build 6. The 1.0.0 uploads used builds 3 and 4, so 5 is valid.
 
 Verified in this package: `codesign --verify --deep --strict` passes for the archived app and the IPA; the Mac pkg is
 signed by the 3rd Party Mac Developer Installer and its app carries the Production iCloud entitlement; the privacy
@@ -42,7 +42,7 @@ and `.pkg` into Transporter. Do not use `tools/archive.sh` again after uploading
 
 ## After upload
 
-1. Wait for processing, then add build 5 to TestFlight.
+1. Wait for processing, then add build 6 to TestFlight.
 2. Test on a real iPhone, in this order:
    - Airplane mode: open "Hello, world", press Run. The on-device engine must pass with no network.
    - Turn the network on: progress appears in Settings as "Progress is in your iCloud" on both the iPhone and the Mac,

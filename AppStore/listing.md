@@ -46,9 +46,9 @@ swiftdata, icloud
 
 ## Support and privacy
 
-- Support: https://asteria.technology/support/
-- Privacy: https://asteria.technology/privacy/
-- Marketing: https://asteria.technology/zero-to-hero/
+- Support: https://learn.asteria.technology/support/
+- Privacy: https://learn.asteria.technology/privacy/
+- Marketing: https://learn.asteria.technology/
 
 ## What is new in 2.0
 
