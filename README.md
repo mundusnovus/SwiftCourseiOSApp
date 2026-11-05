@@ -1,4 +1,4 @@
-# Swift: Zero to Hero 2.0
+# Swift: Zero to Hero 26.11.1
 
 A complete Swift course for iPhone, iPad and Mac, by Asteria Technology. One multiplatform app, 173 lessons in 10
 chapters, no account, and no server of ours.
@@ -6,6 +6,12 @@ chapters, no account, and no server of ours.
 The course goes from the first line of Swift to a shipped app: values and types, collections, control flow, functions,
 optionals, closures, structs, classes, enums, protocols, generics, errors, concurrency, Codable, SwiftUI, SwiftData,
 networking, Apple Intelligence, Siri, iCloud, Liquid Glass, evaluations, sharing and release.
+
+## What 26.11.1 changes
+
+The Asteria 26 look: aqua on night with heavy for highlights, deep aqua as the light-mode accent so tinted text
+keeps 4.5:1, an aqua → violet → heavy gradient for Apple Intelligence, and a new Icon Composer icon with dark, clear
+and tinted versions. See `RELEASE.md`.
 
 ## What 2.0 changes
 

@@ -159,7 +159,7 @@ struct Sidebar: View {
                             Label {
                                 Text(custom.title).font(.reading(.body)).lineLimit(2)
                             } icon: {
-                                Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.emphasis)
+                                Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.intelligence)
                             }
                         }
                         .buttonStyle(.plain)
@@ -352,7 +352,7 @@ struct HomeView: View {
                 Button { model.open(lesson) } label: {
                     Label(model.doneCount == 0 ? "Start" : "Resume", systemImage: "arrow.right")
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.glassProminent).onAccentLabel()
                 .controlSize(.large)
             }
         }

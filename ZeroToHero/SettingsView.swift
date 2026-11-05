@@ -141,7 +141,10 @@ struct SettingsView: View {
         }
 
         Section {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: 12) {
+                Image("IconArt").resizable().interpolation(.high).frame(width: 52, height: 52)
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                    .accessibilityHidden(true)
                 Wordmark(size: 20)
                 Spacer()
                 Text(version).font(.reading(.caption)).foregroundStyle(.secondary).monospacedDigit()

@@ -1,4 +1,4 @@
-// Swift: Zero to Hero 2.0, by Asteria Technology. One multiplatform app: iPhone, iPad and Mac.
+// Swift: Zero to Hero 26.11.1, by Asteria Technology. One multiplatform app: iPhone, iPad and Mac.
 import SwiftUI
 import SwiftData
 import AppIntents

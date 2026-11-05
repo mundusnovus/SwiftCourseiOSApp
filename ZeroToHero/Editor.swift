@@ -606,8 +606,8 @@ final class SymbolBar: UIView {
 
         var runConfig = UIButton.Configuration.filled()
         runConfig.title = "Run"
-        runConfig.baseBackgroundColor = UIColor(Palette.sea)
-        runConfig.baseForegroundColor = .white
+        runConfig.baseBackgroundColor = UIColor(Palette.seaText)
+        runConfig.baseForegroundColor = UIColor(Palette.onAccent)
         runConfig.cornerStyle = .capsule
         runConfig.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
         runButton.configuration = runConfig
@@ -617,7 +617,7 @@ final class SymbolBar: UIView {
 
         var doneConfig = UIButton.Configuration.plain()
         doneConfig.title = "Done"
-        doneConfig.baseForegroundColor = UIColor(Palette.gold)
+        doneConfig.baseForegroundColor = UIColor(Palette.emphasis)
         doneButton.configuration = doneConfig
         doneButton.accessibilityLabel = "Hide the keyboard"
         doneButton.addAction(UIAction { [weak self] _ in self?.onDone() }, for: .touchUpInside)

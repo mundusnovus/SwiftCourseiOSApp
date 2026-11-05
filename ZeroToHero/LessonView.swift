@@ -106,7 +106,7 @@ struct LessonFooter: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.glassProminent).onAccentLabel()
             }
             if let previous = neighbours.previous {
                 Button { model.open(previous) } label: {
@@ -151,11 +151,11 @@ struct ReadingLessonView: View {
                 if !lesson.questions.isEmpty { QuizView(lesson: lesson) }
                 if lesson.checklist.isEmpty && lesson.questions.isEmpty && !model.store.isDone(lesson.id) {
                     Button("Mark as read") { model.store.complete(lesson.id); model.say("Lesson done") }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.glassProminent).onAccentLabel()
                 }
                 if model.store.isDone(lesson.id) {
                     HStack(spacing: 12) {
-                        Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.sea)
+                        Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.intelligence)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Review this lesson").font(.reading(.callout, weight: .semibold))
                             Text("A short recap and three questions, written on this device.")
@@ -199,7 +199,7 @@ struct ChecklistView: View {
             }
             if lesson.questions.isEmpty && !model.store.isDone(lesson.id) {
                 Button("Mark as done") { model.store.complete(lesson.id); model.say("Lesson done") }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.glassProminent).onAccentLabel()
                     .disabled(!allTicked)
             } else if !lesson.questions.isEmpty && !model.store.isDone(lesson.id) {
                 Text("Tick these off, then answer the questions below to finish.")
@@ -240,7 +240,7 @@ struct QuizView: View {
             }
             HStack(spacing: 12) {
                 Button(model.store.isDone(lesson.id) ? "Check again" : "Check my answers", action: check)
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.glassProminent).onAccentLabel()
                     .disabled(picks.count < lesson.questions.count)
                 if checked, allRight {
                     Label("All right.", systemImage: "checkmark.seal.fill").foregroundStyle(Palette.pass)
@@ -341,7 +341,7 @@ struct LabLessonView: View {
                 if !lesson.questions.isEmpty { QuizView(lesson: lesson) }
                 if !model.store.isDone(lesson.id) && lesson.questions.isEmpty && lesson.checklist.isEmpty {
                     Button("Mark as done") { model.store.complete(lesson.id); model.say("Lesson done") }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.glassProminent).onAccentLabel()
                 }
                 LessonFooter(lesson: lesson)
             }
@@ -495,7 +495,7 @@ struct CodeLessonView: View {
                     }
                 }
                 .fixedSize()
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.glassProminent).onAccentLabel()
                 .tint(Palette.sea)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(running)
@@ -558,7 +558,7 @@ struct CodeLessonView: View {
     @ViewBuilder private var nextButton: some View {
         if let next = model.course.neighbours(of: lesson.id).next {
             Button { model.open(next) } label: { Label("Next lesson", systemImage: "arrow.right") }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.glassProminent).onAccentLabel()
                 .help(next.title)
         }
     }
@@ -641,7 +641,7 @@ struct ConsoleView: View {
                 .padding(14)
             }
         }
-        .background(Color(hex: 0x0A1418))
+        .background(Palette.consoleBackground)
         .environment(\.colorScheme, .dark)
     }
 

@@ -167,7 +167,7 @@ struct ShareMilestoneButton: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .buttonStyle(.glassProminent)
+        .buttonStyle(.glassProminent).onAccentLabel()
         .task(id: badge.id) {
             image = ShareCard(badge: badge, streak: model.store.streak, lessons: model.doneCount,
                               total: model.course.lessons.count).render()
@@ -276,10 +276,10 @@ struct ShareCard: View {
         .padding(64)
         .frame(width: 1080, height: 1350, alignment: .leading)
         .background(
-            LinearGradient(colors: [Palette.seaDeep, Palette.night], startPoint: .topLeading, endPoint: .bottomTrailing)
+            LinearGradient(colors: [Palette.seaDeep, Palette.night, Palette.night], startPoint: .topLeading, endPoint: .bottomTrailing)
         )
         .overlay(alignment: .topTrailing) {
-            Circle().fill(Palette.sea.opacity(0.35)).frame(width: 420).blur(radius: 80).offset(x: 120, y: -120)
+            Circle().fill(Palette.violet.opacity(0.35)).frame(width: 420).blur(radius: 80).offset(x: 120, y: -120)
         }
         .clipShape(.rect(cornerRadius: 0))
     }

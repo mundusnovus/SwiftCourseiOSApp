@@ -1,4 +1,6 @@
-// Asteria's colours and type. SF Pro for everything a person reads; Asteria Pixel for the word "Asteria" only.
+// Asteria 26: aqua on night, heavy for highlights, an aqua-violet-heavy gradient for Apple Intelligence.
+// RULE: tinted text keeps 4.5:1. Pure aqua on white is 1.3:1, so light appearance uses deep aqua #00826B.
+// SF Pro for everything a person reads; Asteria Pixel for the word "Asteria" only.
 // Multiplatform: no UIKit or AppKit type leaks out of this file.
 import SwiftUI
 import CoreText
@@ -9,37 +11,59 @@ import UIKit
 #endif
 
 enum Palette {
-    static let sea = Color(hex: 0x1C8C9E)
-    static let seaBright = Color(hex: 0x3BB3C3)
-    static let seaDeep = Color(hex: 0x116674)
-    static let gold = Color(hex: 0xE9B04B)
-    static let goldDeep = Color(hex: 0xA8761A)
-    static let night = Color(hex: 0x0C1A2B)
-    static let cream = Color(hex: 0xFBF1DC)
+    /// Asteria sea: deep aqua in light appearance so symbols keep 3:1 on white, sea #00C9A7 in dark.
+    static let sea = Color(light: 0x00826B, dark: 0x00C9A7)
+    /// Asteria aqua, exactly.
+    static let seaBright = Color(hex: 0x00FFD3)
+    /// Deep aqua: fills that carry white text.
+    static let seaDeep = Color(hex: 0x00826B)
+    /// Asteria heavy, exactly: milestones, trophies, the cursor.
+    static let gold = Color(hex: 0xFF0058)
+    static let goldDeep = Color(hex: 0xE0004E)
+    static let violet = Color(hex: 0x7A5CFF)
+    /// Asteria night.
+    static let night = Color(hex: 0x05080F)
+    /// Starlight cream.
+    static let cream = Color(hex: 0xE9FBF7)
+    /// Apple Intelligence moments: aqua into violet into heavy.
+    static let intelligence = LinearGradient(colors: [Color(hex: 0x00FFD3), Color(hex: 0x7A5CFF), Color(hex: 0xFF0058)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing)
     static let alert = Color(hex: 0xC4432D)
-    static let pass = Color(hex: 0x4CAF7A)
-    /// Gold for small emphasis. Gold deep on light surfaces keeps 4.5:1 contrast.
-    static let emphasis = Color(light: 0xA8761A, dark: 0xE9B04B)
-    /// Sea and alert for text and small symbols. Plain `sea` (#1C8C9E) is 3.9:1 on white, under the 4.5:1 bar.
-    static let seaText = Color(light: 0x116674, dark: 0x3BB3C3)
+    static let pass = Color(light: 0x2F7A3E, dark: 0x4CAF7A)
+    /// Heavy for small emphasis, at 4.5:1 in both appearances.
+    static let emphasis = Color(light: 0xE0004E, dark: 0xFF3D7F)
+    /// The accent for text and small symbols: deep aqua (4.8:1 on white) in light, pure aqua in dark.
+    static let seaText = Color(light: 0x00826B, dark: 0x00FFD3)
     static let alertText = Color(light: 0xB23A26, dark: 0xFF9B85)
+    /// Text and symbols on an accent fill: white on deep aqua, near-black on pure aqua.
+    static let onAccent = Color(light: 0xFFFFFF, dark: 0x00140F)
 
-    // The editor is always dark, like Xcode's default.
-    static let editorBackground = Color(hex: 0x0E1B20)
-    static let editorText = Color(hex: 0xDFE6EA)
+    // The editor is always dark, like Xcode's default, on Asteria night.
+    static let editorBackground = Color(hex: 0x0A1220)
+    static let editorText = Color(hex: 0xE9FBF7)
+    /// The console under the editor, a step darker.
+    static let consoleBackground = Color(hex: 0x05080F)
 }
 
 /// Accents a person can choose. Each has a darker light-mode value and a brighter dark-mode value, so tinted text
 /// keeps 4.5:1 contrast in both appearances. Stored in iCloud key-value storage, so every device matches.
 enum AccentChoice: String, CaseIterable, Identifiable {
-    case sea, lagoon, gold, coral, violet, forest, graphite
+    case sea, heavy, lagoon, gold, coral, violet, forest, graphite
 
     var id: String { rawValue }
-    var name: String { rawValue.capitalized }
 
+    var name: String {
+        switch self {
+        case .sea: "Asteria"
+        default: rawValue.capitalized
+        }
+    }
+
+    /// (light appearance, dark appearance)
     private var hexes: (UInt32, UInt32) {
         switch self {
-        case .sea: (0x116674, 0x3BB3C3)
+        case .sea: (0x00826B, 0x00FFD3)
+        case .heavy: (0xE0004E, 0xFF3D7F)
         case .lagoon: (0x1D5FA8, 0x5EA8F2)
         case .gold: (0x8A5F10, 0xE9B04B)
         case .coral: (0xB23A26, 0xF07F69)
@@ -169,4 +193,23 @@ struct IconTile: View {
             .background(tint.opacity(0.14), in: .rect(cornerRadius: 8))
             .accessibilityHidden(true)
     }
+}
+
+/// The label of a prominent button sits on the accent fill, so it uses `onAccent`. On the Mac an inactive window draws
+/// prominent buttons without the fill, and there the label goes back to the normal text colour.
+struct OnAccentLabel: ViewModifier {
+    #if os(macOS)
+    @Environment(\.appearsActive) private var appearsActive
+    #else
+    private let appearsActive = true
+    #endif
+    @Environment(\.isEnabled) private var isEnabled
+
+    func body(content: Content) -> some View {
+        content.foregroundStyle(appearsActive && isEnabled ? AnyShapeStyle(Palette.onAccent) : AnyShapeStyle(.primary))
+    }
+}
+
+extension View {
+    func onAccentLabel() -> some View { modifier(OnAccentLabel()) }
 }

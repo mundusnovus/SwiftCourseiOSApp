@@ -326,7 +326,7 @@ struct CodeCoachSheet: View {
                         Button(action: ask) {
                             Label(passed ? "Review my code" : "Explain this", systemImage: "apple.intelligence")
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.glassProminent).onAccentLabel()
                     }
                     if model.working {
                         HStack(spacing: 10) {
@@ -482,7 +482,7 @@ struct StudySheet: View {
                                 .textFieldStyle(.roundedBorder)
                                 .onSubmit(generate)
                             Button("Write it", action: generate)
-                                .buttonStyle(.glassProminent)
+                                .buttonStyle(.glassProminent).onAccentLabel()
                                 .disabled(topic.trimmingCharacters(in: .whitespaces).isEmpty || intelligence.working)
                         }
                         suggestions
@@ -497,7 +497,7 @@ struct StudySheet: View {
                             model.say("Saved to My Lessons")
                             dismiss()
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.glassProminent).onAccentLabel()
                     } else if let draft = intelligence.draft {
                         MiniLessonCard(title: draft.title ?? "", intro: draft.intro ?? "", points: draft.keyPoints ?? [],
                                        example: draft.example ?? "", practice: draft.practice ?? "")
@@ -637,7 +637,7 @@ struct CustomLessonView: View {
                         Button(action: run) {
                             if running { ProgressView().controlSize(.small) } else { Label("Run", systemImage: "play.fill") }
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.glassProminent).onAccentLabel()
                         .disabled(running)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
@@ -704,7 +704,7 @@ struct StudyPlanSheet: View {
                         Label {
                             Text(note).font(.reading(.callout))
                         } icon: {
-                            Image(systemName: "apple.intelligence").foregroundStyle(Palette.seaText)
+                            Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.intelligence)
                         }
                     }
                 } footer: {

@@ -1,3 +1,33 @@
+# Release 26.11.1 — Asteria 26 look
+
+Version **26.11.1**, build **7**. Build 6 went to App Store Connect as 2.0.0, so 7 is the next free number.
+
+## What changed
+
+- **Asteria 26 palette.** Night `#05080F`, aqua `#00FFD3`, sea `#00C9A7`, deep aqua `#00826B`, heavy `#FF0058`, violet
+  `#7A5CFF` and starlight cream `#E9FBF7`. The accent is deep aqua in light and aqua in dark, so tinted text keeps
+  4.5:1. Text and symbols on an accent fill use `onAccent` (white in light, `#00140F` in dark).
+- **Heavy for highlights.** Milestones, trophies, streaks and small labels use heavy (`#E0004E` / `#FF3D7F` as text).
+- **Apple Intelligence gradient.** Aqua → violet → heavy on the Apple Intelligence symbols.
+- **New accent choice.** "Asteria" (the default, stored as `sea` so saved choices carry over) and a new "Heavy".
+- **New icon.** `ZeroToHero/AppIcon.icon`: aqua steps climbing from a cream zero to a heavy Asteria star, with dark,
+  clear and tinted versions. `tools/make-icon.py` regenerates the layers; soft glows stay in the flat background
+  layer. The `AppIcon.appiconset` PNGs and the Settings → About art are rendered from it with `ictool`.
+
+## Before uploading
+
+1. Archive with `tools/archive.sh` (iOS and Mac). `VERSION` and `MARKETING_VERSION` both say 26.11.1;
+   `tools/check.sh` fails if they differ.
+2. Retake the App Store screenshots with `tools/screenshots-ios.sh all` and `tools/screenshots-mac.sh`. The files in
+   `AppStore/screenshots/` still show the 2.0.0 colours.
+3. Upload build 7 for iOS and macOS, then test it in TestFlight with the "After upload" steps below.
+
+---
+
+The 2.0.0 (build 6) checklist follows for reference. Its App Store Connect, privacy and TestFlight steps still apply;
+read its version and build numbers as 26.11.1 and 7.
+
+
 # Release 2.0.0 — upload checklist
 
 Everything below is for build **6**. The archives are on this Mac under `build/archive/` and are git-ignored; a fresh
