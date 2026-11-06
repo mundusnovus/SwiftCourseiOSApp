@@ -155,7 +155,7 @@ struct ReadingLessonView: View {
                 }
                 if model.store.isDone(lesson.id) {
                     HStack(spacing: 12) {
-                        Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.intelligence)
+                        Image(systemName: "sparkles").symbol().foregroundStyle(Palette.intelligence)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Review this lesson").font(.reading(.callout, weight: .semibold))
                             Text("A short recap and three questions, written on this device.")
@@ -522,8 +522,8 @@ struct CodeLessonView: View {
 
             if let result, !result.passed, !result.unsupported {
                 Button { showCoach = true } label: {
-                    Label(result.compiled ? "Why doesn't it pass? Ask the coach" : "Explain this error with Apple Intelligence",
-                          systemImage: "apple.intelligence")
+                    Label(result.compiled ? "Why doesn't it pass? Ask the coach" : "Explain this error with Asteria Intelligence",
+                          systemImage: "sparkles")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
@@ -551,7 +551,7 @@ struct CodeLessonView: View {
     }
 
     private var reviewButton: some View {
-        Button("Review my code", systemImage: "apple.intelligence") { showCoach = true }
+        Button("Review my code", systemImage: "sparkles") { showCoach = true }
             .buttonStyle(.glass)
     }
 

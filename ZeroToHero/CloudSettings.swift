@@ -21,9 +21,9 @@ enum CloudSettings {
         observers.append(NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: cloud, queue: .main
         ) { note in
-            let changed = note.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? keys
+            let reported = note.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String]
             MainActor.assumeIsolated {
-                for key in changed where keys.contains(key) {
+                for key in reported ?? keys where keys.contains(key) {
                     UserDefaults.standard.set(NSUbiquitousKeyValueStore.default.object(forKey: key), forKey: key)
                 }
             }

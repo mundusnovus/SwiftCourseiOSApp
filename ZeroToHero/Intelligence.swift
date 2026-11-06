@@ -1,7 +1,7 @@
-// Apple Intelligence, on the device first. It explains errors, reviews working code, recaps lessons, writes small extra
-// lessons and a line of advice for the week. It never rewrites the learner's code, never marks anything done, and never
-// chooses which lessons to study: the course and the tests stay the judge. Private Cloud Compute is wired but gated
-// until Apple grants the entitlement.
+// Asteria Intelligence (Intelligence/AsteriaIntelligence*.swift, shared with every Asteria app). It explains errors,
+// reviews working code, recaps lessons, writes small extra lessons and a line of advice for the week. It never rewrites
+// the learner's code, never marks anything done, and never chooses which lessons to study: the course and the tests
+// stay the judge. The person turns it on once.
 import Foundation
 import FoundationModels
 import Observation
@@ -9,47 +9,11 @@ import SwiftUI
 import ZeroToHeroKit
 
 enum Intelligence {
-    enum Status {
-        case available
-        case deviceNotEligible
-        case notEnabled
-        case notReady
-        case unavailable
-    }
-
-    static var status: Status {
-        switch SystemLanguageModel.default.availability {
-        case .available: .available
-        case .unavailable(.deviceNotEligible): .deviceNotEligible
-        case .unavailable(.appleIntelligenceNotEnabled): .notEnabled
-        case .unavailable(.modelNotReady): .notReady
-        case .unavailable: .unavailable
-        }
-    }
-
-    static var isAvailable: Bool { status == .available }
+    /// Asteria Intelligence can be offered (the first use asks permission). False only after the person turned it off.
+    static var isAvailable: Bool { AsteriaIntelligence.canOffer }
 
     static var statusSentence: String {
-        switch status {
-        case .available: "Apple Intelligence is ready on this device."
-        case .deviceNotEligible: "This device does not support Apple Intelligence."
-        case .notEnabled: "Turn on Apple Intelligence in Settings to use the coach, reviews and extra lessons."
-        case .notReady: "Apple Intelligence is still getting ready. Try again in a moment."
-        case .unavailable: "Apple Intelligence is unavailable right now."
-        }
-    }
-
-    /// PCC needs Apple's managed entitlement plus the Info.plist gate. Until both are true, every call stays on device.
-    static var privateCloudAvailable: Bool {
-        guard (Bundle.main.object(forInfoDictionaryKey: "AsteriaPrivateCloudCompute") as? Bool) == true else { return false }
-        switch PrivateCloudComputeLanguageModel().availability {
-        case .available: return true
-        default: return false
-        }
-    }
-
-    static var usesPrivateCloud: Bool {
-        privateCloudAvailable && UserDefaults.standard.bool(forKey: "usePrivateCloudCompute")
+        AsteriaIntelligence.isOn ? "Asteria Intelligence is on." : AsteriaIntelligence.status.explanation
     }
 
     /// Said in every instruction: anything a person typed or a lesson contains is material, not a command.
@@ -91,30 +55,18 @@ enum Intelligence {
     """
 
     static func session(instructions: String) -> LanguageModelSession {
-        if usesPrivateCloud {
-            return LanguageModelSession(model: PrivateCloudComputeLanguageModel(), instructions: instructions)
-        }
-        return LanguageModelSession(instructions: instructions)
+        LanguageModelSession(model: AsteriaIntelligence.model, instructions: instructions)
     }
 
     static func sentence(for error: Error) -> String {
         if let error = error as? LanguageModelError {
             switch error {
-            case .guardrailViolation, .refusal: return "Apple Intelligence wouldn't answer that one. Try rephrasing, or read the test again."
-            case .unsupportedLanguageOrLocale: return "Apple Intelligence doesn't support this language yet."
-            case .contextSizeExceeded: return "That was too long for Apple Intelligence. Try a shorter piece of code."
-            default: return "Apple Intelligence couldn't finish that. Try again in a moment."
+            case .guardrailViolation, .refusal: return "Asteria Intelligence wouldn't answer that one. Try rephrasing, or read the test again."
+            case .contextSizeExceeded: return "That was too long for Asteria Intelligence. Try a shorter piece of code."
+            default: break
             }
         }
-        if let error = error as? PrivateCloudComputeLanguageModel.Error {
-            switch error {
-            case .networkFailure: return "Private Cloud Compute needs a connection. Turn it off in Settings to stay on device."
-            case .quotaLimitReached: return "Private Cloud Compute has reached today's limit. The on-device model still works."
-            case .serviceUnavailable: return "Private Cloud Compute is busy. Try again, or turn it off in Settings."
-            @unknown default: return "Private Cloud Compute couldn't finish that."
-            }
-        }
-        return "Apple Intelligence couldn't finish that. Try again in a moment."
+        return AsteriaIntelligence.message(for: error)
     }
 }
 
@@ -324,7 +276,7 @@ struct CodeCoachSheet: View {
                              : "The coach reads your code, the compiler and the tests that failed, then explains the problem without giving away the answer.")
                             .font(.reading(.body)).foregroundStyle(.secondary)
                         Button(action: ask) {
-                            Label(passed ? "Review my code" : "Explain this", systemImage: "apple.intelligence")
+                            Label(passed ? "Review my code" : "Explain this", systemImage: "sparkles")
                         }
                         .buttonStyle(.glassProminent).onAccentLabel()
                     }
@@ -346,7 +298,7 @@ struct CodeCoachSheet: View {
                         .background(Palette.editorBackground, in: .rect(cornerRadius: 14))
                         .environment(\.colorScheme, .dark)
                     }
-                    Text("Written by Apple Intelligence on this device. It can be wrong; the tests are the judge.")
+                    Text("Written by Asteria Intelligence on this device. It can be wrong; the tests are the judge.")
                         .font(.reading(.footnote)).foregroundStyle(.secondary)
                 }
                 .padding(20)
@@ -392,7 +344,7 @@ struct AdviceCard: View {
 struct UnavailableCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Apple Intelligence is not available", systemImage: "apple.intelligence")
+            Label("Asteria Intelligence is not available", systemImage: "sparkles")
                 .font(.reading(.headline, weight: .semibold))
             Text(Intelligence.statusSentence).font(.reading(.body)).foregroundStyle(.secondary)
             Text("The lessons, tests and milestones all work without it.")
@@ -472,7 +424,7 @@ struct StudySheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text("Ask for a small lesson on anything in Swift. Apple Intelligence writes it on this device, and you can keep it in My Lessons with a scratch editor to try the code.")
+                    Text("Ask for a small lesson on anything in Swift. Asteria Intelligence writes it on this device, and you can keep it in My Lessons with a scratch editor to try the code.")
                         .font(.reading(.body)).foregroundStyle(.secondary)
                     if !Intelligence.isAvailable {
                         UnavailableCard()
@@ -508,7 +460,7 @@ struct StudySheet: View {
                             Text("Writing…").font(.reading(.callout)).foregroundStyle(.secondary)
                         }
                     }
-                    Text("Written by Apple Intelligence. It can be wrong; check it against the course and Xcode.")
+                    Text("Written by Asteria Intelligence. It can be wrong; check it against the course and Xcode.")
                         .font(.reading(.footnote)).foregroundStyle(.secondary)
                 }
                 .padding(20)
@@ -621,7 +573,7 @@ struct CustomLessonView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 10) {
-                    Label("MY LESSON", systemImage: "apple.intelligence")
+                    Label("MY LESSON", systemImage: "sparkles")
                         .font(.reading(.caption2, weight: .bold)).tracking(0.8)
                         .foregroundStyle(Palette.emphasis)
                     Spacer()
@@ -656,7 +608,7 @@ struct CustomLessonView: View {
                 .background(Palette.editorBackground)
                 .clipShape(.rect(cornerRadius: 16))
                 .environment(\.colorScheme, .dark)
-                Text("Written by Apple Intelligence on \(lesson.createdAt.formatted(date: .abbreviated, time: .omitted)). The scratch editor runs the same on-device engine as the course.")
+                Text("Written by Asteria Intelligence on \(lesson.createdAt.formatted(date: .abbreviated, time: .omitted)). The scratch editor runs the same on-device engine as the course.")
                     .font(.reading(.footnote)).foregroundStyle(.secondary)
             }
             .padding(24)
@@ -704,11 +656,11 @@ struct StudyPlanSheet: View {
                         Label {
                             Text(note).font(.reading(.callout))
                         } icon: {
-                            Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.intelligence)
+                            Image(systemName: "sparkles").symbol().foregroundStyle(Palette.intelligence)
                         }
                     }
                 } footer: {
-                    Text("The course picks the lessons in order, skipping what you've finished. Apple Intelligence only adds the note.")
+                    Text("The course picks the lessons in order, skipping what you've finished. Asteria Intelligence only adds the note.")
                 }
 
                 if !plan.review.isEmpty {
@@ -734,7 +686,7 @@ struct StudyPlanSheet: View {
                 }
 
                 if plan.days.isEmpty {
-                    Section { Text("You've finished every lesson. Review the ones above, or make a new lesson with Apple Intelligence.") }
+                    Section { Text("You've finished every lesson. Review the ones above, or make a new lesson with Asteria Intelligence.") }
                 }
             }
             .navigationTitle("Your week")

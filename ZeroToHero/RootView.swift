@@ -8,6 +8,7 @@ struct RootView: View {
     @State private var compactColumn: NavigationSplitViewColumn = .detail
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("accent") private var accentRaw = AccentChoice.sea.rawValue
+    @State private var showAsteria = false
 
     private var accent: Color { (AccentChoice(rawValue: accentRaw) ?? .sea).color }
 
@@ -35,8 +36,12 @@ struct RootView: View {
         .sheet(isPresented: $model.showAchievements) { AchievementsView().tint(accent) }
         .sheet(isPresented: $model.showStudy) { StudySheet().tint(accent) }
         .sheet(isPresented: $model.showPlan) { StudyPlanSheet().tint(accent) }
+        .sheet(isPresented: $showAsteria) { ZTHAsteriaSheet().tint(accent) }
         .sheet(isPresented: newMilestones) { NewMilestonesSheet().tint(accent) }
-        .onChange(of: model.selection) { _, _ in compactColumn = .detail }
+        .onChange(of: model.selection) { _, _ in
+            compactColumn = .detail
+            ZTHChats.openLesson = model.selectedLesson
+        }
         .onChange(of: model.customSelection) { _, _ in compactColumn = .detail }
         .onChange(of: scenePhase) { _, phase in
             // Pick up progress from the person's other devices when they come back to this one.
@@ -69,7 +74,8 @@ struct RootView: View {
     }
 
     private var intelligenceMenu: some View {
-        Menu("Apple Intelligence", systemImage: "apple.intelligence") {
+        Menu("Asteria Intelligence", systemImage: "sparkles") {
+            Button("Ask Asteria", systemImage: "sparkle") { showAsteria = true }
             Button("Plan My Week", systemImage: "calendar") { model.showPlan = true }
             Button("Make a Lesson", systemImage: "text.badge.plus") { model.showStudy = true }
         }
@@ -159,7 +165,7 @@ struct Sidebar: View {
                             Label {
                                 Text(custom.title).font(.reading(.body)).lineLimit(2)
                             } icon: {
-                                Image(systemName: "apple.intelligence").symbol().foregroundStyle(Palette.intelligence)
+                                Image(systemName: "sparkles").symbol().foregroundStyle(Palette.intelligence)
                             }
                         }
                         .buttonStyle(.plain)

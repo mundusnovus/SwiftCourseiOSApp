@@ -1,5 +1,18 @@
 # Swift: Zero to Hero 2.0 — product
 
+## 27.2 (8) (6 November 2026)
+
+- Versions are named after the iOS release (27.2 now; the Siri AI update will be 27.3 (1)).
+- **Asteria Intelligence** replaces the on-device model and Private Cloud Compute (decision C below is retired):
+  code coach, review, recap, mini-lessons and the study plan run on it (`ZeroToHero/Intelligence`, synced from
+  AsteriaSearch by `tools/sync-intelligence.sh`). The one-time permission sheet comes first; Settings has the switch.
+- **Ask Asteria** (the Asteria Intelligence menu; `ZTHChats.swift`): the shared Asteria chat, which knows the open
+  lesson. Chats sync with every Asteria app when signed in.
+- **Asteria Account** in Settings: normal username, tokens, The Asteria Subscription's tiers, sign out, delete.
+  Keychain group `KZFR2T5L2A.technology.asteria.account` in both entitlements.
+- The SwiftPM Mac app (SwiftCourseApp) has the same, with Asteria in its own window; it now needs macOS 27.
+- Verified: builds for iPhone and Mac with no warnings. Not verified: the real model, devices.
+
 ## The brief
 
 Version 2.0 of Swift: Zero to Hero for Mac and iOS, from the owner's seven points:

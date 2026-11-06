@@ -1,4 +1,4 @@
-// Settings on both platforms: appearance, reading, iCloud, Apple Intelligence, progress, and the honest about block.
+// Settings on both platforms: appearance, reading, iCloud, Asteria Intelligence, progress, and the honest about block.
 import SwiftUI
 import AppIntents
 import ZeroToHeroKit
@@ -9,7 +9,6 @@ struct SettingsView: View {
     @AppStorage("accent") private var accent = AccentChoice.sea.rawValue
     @AppStorage("editorFontSize") private var fontSize = 14.0
     @AppStorage("shareWithSiri") private var shareWithSiri = true
-    @AppStorage("usePrivateCloudCompute") private var usePCC = false
     @State private var confirmReset = false
 
     private var choice: AccentChoice { AccentChoice(rawValue: accent) ?? .sea }
@@ -89,24 +88,8 @@ struct SettingsView: View {
             Text("iCloud")
         }
 
-        Section {
-            HStack {
-                Label(Intelligence.statusSentence, systemImage: "apple.intelligence")
-                    .foregroundStyle(Intelligence.isAvailable ? .primary : .secondary)
-                    .font(.reading(.callout))
-                Spacer()
-            }
-            Toggle("Use Private Cloud Compute when needed", isOn: $usePCC)
-                .disabled(!Intelligence.privateCloudAvailable)
-            Text(Intelligence.privateCloudAvailable
-                 ? "Heavier explanations can use Apple's Private Cloud Compute. Requests stay private to you and count against Apple's daily limit."
-                 : "Private Cloud Compute needs Apple's managed entitlement. Until it is granted, every feature runs on this device.")
-                .font(.reading(.caption)).foregroundStyle(.secondary)
-        } header: {
-            Text("Apple Intelligence")
-        } footer: {
-            Text("Your code, errors and topics stay on this device. Nothing is sent to Asteria.")
-        }
+        AsteriaAccountSection { ZTHChats.asteria.forgetOnThisDevice() }
+        AsteriaIntelligenceSettingsSection()
 
         Section {
             Toggle("Share lessons with Siri and Spotlight", isOn: $shareWithSiri)
@@ -160,7 +143,7 @@ struct SettingsView: View {
         } header: {
             Text("About")
         } footer: {
-            Text("© 2026 Asteria Technology. Swift and Apple Intelligence are Apple's.")
+            Text("© 2026 Asteria Technology. Swift and Asteria Intelligence are Apple's.")
         }
     }
 
