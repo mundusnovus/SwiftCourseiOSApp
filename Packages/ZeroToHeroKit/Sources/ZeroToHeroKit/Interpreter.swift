@@ -105,7 +105,9 @@ nonisolated struct RuntimeError: Error, CustomStringConvertible {
 
 nonisolated struct TimeoutError: Error {}
 
-nonisolated struct ThrownError: Error {
+/// A value the learner's program throws. Value holds class references, so it isn't Sendable; this error is thrown and
+/// caught inside one interpreter run, on one thread, and never crosses an isolation boundary.
+nonisolated struct ThrownError: Error, @unchecked Sendable {
     let value: Value
     let line: Int
 }
@@ -167,7 +169,7 @@ nonisolated final class Interpreter {
         switch statement {
         case .letDecl(let name, let type, let value, _, let line):
             try tick(line)
-            let resolved = try value.map { try copyValue(try evaluate($0)) } ?? defaultValue(for: type, line: line)
+            let resolved = try value.map { try copyValue(evaluate($0)) } ?? defaultValue(for: type, line: line)
             if let type, type.hasPrefix("Set<"), case .array(let array) = resolved { array.isSet = true }
             scope.define(name, coerce(resolved, to: type))
             return .normal
@@ -292,7 +294,7 @@ nonisolated final class Interpreter {
 
         case .returnStmt(let expr, let line):
             try tick(line)
-            return .returnValue(try expr.map { try copyValue(try evaluate($0)) } ?? .void)
+            return .returnValue(try expr.map { try copyValue(evaluate($0)) } ?? .void)
 
         case .breakStmt: return .breakLoop
         case .continueStmt: return .continueLoop
@@ -622,7 +624,7 @@ nonisolated final class Interpreter {
         if let native = function.native { return try native(args, line) }
         let local = Scope(parent: function.closure)
         var used = Array(repeating: false, count: args.count)
-        for (index, param) in function.params.enumerated() {
+        for param in function.params {
             if param.variadic {
                 let rest = args.enumerated().filter { !used[$0.offset] }.map { copyValue($0.element) }
                 local.define(param.name, .array(ArrayRef(rest)))
@@ -1188,8 +1190,6 @@ nonisolated final class Interpreter {
             return method(name) { args, l in .string(String(s.prefix(try self.intValue(args[0], line: l)))) }
         case "suffix":
             return method(name) { args, l in .string(String(s.suffix(try self.intValue(args[0], line: l)))) }
-        case "suffix":
-            return method(name) { args, l in .string(String(s.suffix(try self.intValue(args[0], line: l)))) }
         case "trimmingCharacters":
             return method(name) { _, _ in .string(s.trimmingCharacters(in: .whitespacesAndNewlines)) }
         case "map":
@@ -1265,18 +1265,18 @@ nonisolated final class Interpreter {
                 }
                 return best ?? .none
             }
-        case "append": return method(name) { args, l in a.items.append(try self.copyValue(args[0])); return .void }
+        case "append": return method(name) { args, l in a.items.append(self.copyValue(args[0])); return .void }
         case "insert":
             return method(name) { args, l in
                 guard let first = args.first else { return .void }
                 if args.count == 1 {
                     if a.isSet, a.items.contains(where: { self.valuesEqual($0, first) }) { return .void }
-                    a.items.append(try self.copyValue(first))
+                    a.items.append(self.copyValue(first))
                     return .void
                 }
                 let index = try self.intValue(args[1], line: l)
                 guard index >= 0, index <= a.items.count else { throw RuntimeError(message: "Index out of range.", line: l) }
-                a.items.insert(try self.copyValue(first), at: index)
+                a.items.insert(self.copyValue(first), at: index)
                 return .void
             }
         case "remove":
@@ -1325,13 +1325,13 @@ nonisolated final class Interpreter {
         case "map":
             return method(name) { args, l in
                 let f = args[0]
-                return .array(ArrayRef(try a.items.map { try self.call(f, [try self.copyValue($0)], line: l) }))
+                return .array(ArrayRef(try a.items.map { try self.call(f, [self.copyValue($0)], line: l) }))
             }
         case "filter":
             return method(name) { args, l in
                 let f = args[0]
                 var out: [Value] = []
-                for item in a.items where try self.truth(self.call(f, [try self.copyValue(item)], line: l), line: l) {
+                for item in a.items where try self.truth(self.call(f, [self.copyValue(item)], line: l), line: l) {
                     out.append(item)
                 }
                 return .array(ArrayRef(out))
@@ -1341,7 +1341,7 @@ nonisolated final class Interpreter {
                 let f = args[1]
                 var result = args[0]
                 for item in a.items {
-                    result = try self.call(f, [result, try self.copyValue(item)], line: l)
+                    result = try self.call(f, [result, self.copyValue(item)], line: l)
                 }
                 return result
             }
@@ -1352,7 +1352,7 @@ nonisolated final class Interpreter {
                 }
                 let f = args[0]
                 let sorted = try a.items.sorted { lhs, rhs in
-                    try self.truth(self.call(f, [try self.copyValue(lhs), try self.copyValue(rhs)], line: l), line: l)
+                    try self.truth(self.call(f, [self.copyValue(lhs), self.copyValue(rhs)], line: l), line: l)
                 }
                 return .array(ArrayRef(sorted))
             }
@@ -1373,7 +1373,7 @@ nonisolated final class Interpreter {
         case "allSatisfy":
             return method(name) { args, l in
                 let f = args[0]
-                for item in a.items where try !self.truth(self.call(f, [try self.copyValue(item)], line: l), line: l) {
+                for item in a.items where try !self.truth(self.call(f, [self.copyValue(item)], line: l), line: l) {
                     return .bool(false)
                 }
                 return .bool(true)
@@ -1383,7 +1383,7 @@ nonisolated final class Interpreter {
                 let f = args[0]
                 var out: [Value] = []
                 for item in a.items {
-                    let value = try self.call(f, [try self.copyValue(item)], line: l)
+                    let value = try self.call(f, [self.copyValue(item)], line: l)
                     if case .none = value { continue }
                     out.append(value)
                 }
@@ -1394,7 +1394,7 @@ nonisolated final class Interpreter {
                 let f = args[0]
                 var out: [Value] = []
                 for item in a.items {
-                    let value = try self.call(f, [try self.copyValue(item)], line: l)
+                    let value = try self.call(f, [self.copyValue(item)], line: l)
                     if case .array(let inner) = value { out.append(contentsOf: inner.items) }
                 }
                 return .array(ArrayRef(out))
@@ -1414,7 +1414,7 @@ nonisolated final class Interpreter {
             return method(name) { args, l in
                 let f = args[0]
                 var out: [String: Value] = [:]
-                for (key, value) in d.items { out[key] = try self.call(f, [try self.copyValue(value)], line: l) }
+                for (key, value) in d.items { out[key] = try self.call(f, [self.copyValue(value)], line: l) }
                 return .dictionary(DictRef(out))
             }
         case "filter":
@@ -1423,7 +1423,7 @@ nonisolated final class Interpreter {
                 var out: [String: Value] = [:]
                 for (key, value) in d.items {
                     let pair = Value.instance(InstanceRef(typeName: "Dictionary.Element",
-                                                          fields: ["key": .string(key), "value": try self.copyValue(value)]))
+                                                          fields: ["key": .string(key), "value": self.copyValue(value)]))
                     if try self.truth(self.call(f, [pair], line: l), line: l) { out[key] = value }
                 }
                 return .dictionary(DictRef(out))
@@ -1434,7 +1434,7 @@ nonisolated final class Interpreter {
                 var out: [Value] = []
                 for (key, value) in d.items {
                     let pair = Value.instance(InstanceRef(typeName: "Dictionary.Element",
-                                                          fields: ["key": .string(key), "value": try self.copyValue(value)]))
+                                                          fields: ["key": .string(key), "value": self.copyValue(value)]))
                     out.append(try self.call(f, [pair], line: l))
                 }
                 return .array(ArrayRef(out))
@@ -1445,7 +1445,7 @@ nonisolated final class Interpreter {
     }
 
     private func lessThan(_ a: Value, _ b: Value, line: Int) throws -> Bool {
-        if case .instance(let x) = a, case .instance(let y) = b {
+        if case .instance(let x) = a, case .instance = b {
             var typeName: String? = x.typeName
             while let name = typeName, let decl = structures[name] {
                 if let method = decl.staticMethods.first(where: { $0.name == "<" }) {

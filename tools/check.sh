@@ -24,7 +24,11 @@ project_version="$(grep -m1 'MARKETING_VERSION = ' ZeroToHero.xcodeproj/project.
 
 echo "3. Serverless"
 # Web links (privacy, license) are fine; a network call is not. Apple's own services go through their frameworks.
-! grep -RqE 'URLSession|URLRequest|NWConnection' --include='*.swift' ZeroToHero Packages || fail "the app makes a network call"
+# The one exception is Asteria Intelligence (ZeroToHero/Intelligence, the shared kit synced from AsteriaSearch by
+# tools/sync-intelligence.sh): it talks to Asteria's gateway, and only after the person says yes. Checking code never
+# leaves the device.
+! grep -RqE 'URLSession|URLRequest|NWConnection' --include='*.swift' --exclude-dir=Intelligence ZeroToHero Packages \
+  || fail "the app makes a network call outside Asteria Intelligence"
 ! grep -RqE 'learn\.asteria\.technology/(api|run|compile)' ZeroToHero Packages || fail "a server endpoint is still referenced"
 ! grep -Rq 'RemoteRunner' ZeroToHero Packages || fail "RemoteRunner still exists"
 [ ! -f ZeroToHero/Resources/solutions.json ] || fail "solutions must not ship in the app"
@@ -81,4 +85,4 @@ check_shot AppStore/screenshots/6.9-3-milestones.png 1320 2868
 check_shot AppStore/screenshots/ipad-1-home.png 2064 2752
 check_shot AppStore/screenshots/mac-2880.png 2880 1800
 
-echo "OK. Not checked here: signing, device install, iCloud sync, Siri phrases, PCC."
+echo "OK. Not checked here: signing, device install, iCloud sync, Siri phrases, Asteria Intelligence with the real model."
