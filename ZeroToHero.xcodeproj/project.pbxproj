@@ -161,7 +161,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/ZeroToHero-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/ZeroToHero-macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = KZFR2T5L2A;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -205,7 +205,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/ZeroToHero-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/ZeroToHero-macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = KZFR2T5L2A;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
