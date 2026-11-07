@@ -115,7 +115,7 @@ public struct SmartzConsentView: View {
                     Row(symbol: "arrow.up.message",
                         text: "When you use it, what you ask and anything you share with it, like a page, a chat or a photo, goes to Asteria and is answered by our AI provider, DeepInfra, in the United States. With voice, what you say and what Smartz says go to ElevenLabs.")
                     Row(symbol: "hand.raised",
-                        text: "DeepInfra and ElevenLabs keep nothing you send. Asteria keeps your chats only when you sign in, sealed, so they follow you; what Smartz learns about you stays private unless you choose to share it.")
+                        text: "DeepInfra keeps nothing you send, and ElevenLabs handles voice under its own privacy policy. Asteria keeps your chats only when you sign in, sealed, so they follow you; what Smartz learns about you stays private unless you choose to share it.")
                     Row(symbol: "switch.2", text: "You can turn Smartz off at any time in Settings.")
                     Button("Privacy Policy") { openURL(Smartz.privacyURL) }
                         .font(.callout)

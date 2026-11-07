@@ -230,8 +230,22 @@ nonisolated final class MicCapture: @unchecked Sendable {
     private var keeping = false
     private var power: Float = 0
     private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var deliveries = 0
 
     init(format: AVAudioFormat) { self.format = format }
+
+    /// The node that hands the microphone's sound to `receive`. It's made here, outside the main actor, on purpose:
+    /// the audio thread calls its block, and a block written inside a main-actor type carries a main-thread check
+    /// that crashes the app the moment sound arrives (the 27.2.5 (1) dictation crash).
+    func makeSink() -> AVAudioSinkNode {
+        AVAudioSinkNode { [self] _, frames, list -> OSStatus in
+            self.receive(list, frames: frames)
+            return noErr
+        }
+    }
+
+    /// How many times the microphone has delivered sound (0 means it's silent: no sound is reaching the app).
+    var received: Int { lock.lock(); defer { lock.unlock() }; return deliveries }
 
     func receive(_ list: UnsafePointer<AudioBufferList>, frames: AVAudioFrameCount) {
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: list))
@@ -252,6 +266,7 @@ nonisolated final class MicCapture: @unchecked Sendable {
         var sum: Float = 0
         for sample in mono { sum += sample * sample }
         lock.lock()
+        deliveries += 1
         power = (sum / Float(count)).squareRoot()
         if keeping, samples.count < Int(rate * 600) { samples.append(contentsOf: mono) }
         let request = self.request
@@ -302,6 +317,24 @@ nonisolated final class MicCapture: @unchecked Sendable {
     }
 }
 
+/// Apple's speech recognition, called from outside the main actor: its callbacks arrive on background queues, and a
+/// callback written inside a main-actor type would check for the main thread and crash (the 27.2.5 (1) crash the
+/// first time audio mode asked for speech recognition).
+nonisolated enum LiveWords {
+    static func authorize() async -> SFSpeechRecognizerAuthorizationStatus {
+        await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+        }
+    }
+
+    static func task(_ recognizer: SFSpeechRecognizer, _ request: SFSpeechAudioBufferRecognitionRequest,
+                     heard: @escaping @Sendable (String) -> Void) -> SFSpeechRecognitionTask {
+        recognizer.recognitionTask(with: request) { result, _ in
+            if let text = result?.bestTranscription.formattedString { heard(text) }
+        }
+    }
+}
+
 /// The microphone on an engine (with echo cancellation for audio mode).
 @MainActor final class Microphone {
     let engine: AVAudioEngine
@@ -318,10 +351,7 @@ nonisolated final class MicCapture: @unchecked Sendable {
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { throw SmartzError.unavailable("There's no microphone to listen with.") }
         let capture = MicCapture(format: format)
-        let sink = AVAudioSinkNode { _, frames, list -> OSStatus in
-            capture.receive(list, frames: frames)
-            return noErr
-        }
+        let sink = capture.makeSink()
         engine.attach(sink)
         try engine.connectNode(input, to: sink, format: format)
         self.engine = engine
@@ -710,6 +740,7 @@ public final class SmartzVoice {
             phase = .listening
             startLiveWords(mic)
             startMeter()
+            watchForSilence()
         } catch {
             problem = "Smartz couldn't use the microphone."
             releaseSession()
@@ -772,14 +803,7 @@ public final class SmartzVoice {
             #if os(iOS)
             try configureSession(.conversation)
             #endif
-            let engine = AVAudioEngine()
-            let mic = try Microphone(engine: engine, cancelEcho: true)
-            let player = try PCMPlayer(engine: engine)
-            player.drained = { [weak self] in self?.settle() }
-            engine.prepare()
-            try engine.start()
-            microphone = mic
-            conversationPlayer = player
+            try startConversationEngine(cancelEcho: true)
             conversation = chats
             startedAt = .now
             audioMode = true
@@ -787,9 +811,50 @@ public final class SmartzVoice {
             turn = Turn()
             listen()
             startMeter()
+            watchForSilence()
         } catch {
             problem = "Smartz couldn't use the microphone."
             releaseSession()
+        }
+    }
+
+    /// A conversation's engine: the microphone (with echo cancellation, so Smartz's own voice isn't heard as yours)
+    /// and Smartz's voice, on one engine.
+    private func startConversationEngine(cancelEcho: Bool) throws {
+        let engine = AVAudioEngine()
+        let mic = try Microphone(engine: engine, cancelEcho: cancelEcho)
+        let player = try PCMPlayer(engine: engine)
+        player.drained = { [weak self] in self?.settle() }
+        engine.prepare()
+        try engine.start()
+        microphone = mic
+        conversationPlayer = player
+    }
+
+    /// If no sound reaches the app soon after the microphone starts, don't sit there deaf. Echo cancellation can leave
+    /// the input silent (the 27.2.5 (1) orb that never moved): audio mode starts again without it, and listening
+    /// works (talking over Smartz then takes a tap on the orb). Otherwise say so.
+    private func watchForSilence() {
+        guard let capture = microphone?.capture else { return }
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(1_500))
+            guard let self, self.microphone?.capture === capture, capture.received == 0 else { return }
+            if self.audioMode, self.microphone?.cancelsEcho == true {
+                self.tearDownMicrophone()
+                self.conversationPlayer = nil
+                do {
+                    try self.startConversationEngine(cancelEcho: false)
+                    self.listen()
+                    self.startMeter()
+                    self.watchForSilence()
+                } catch {
+                    self.problem = "Smartz couldn't use the microphone."
+                    self.leaveAudioMode()
+                }
+            } else if self.audioMode || self.dictating {
+                self.problem = "No sound is reaching \(Smartz.appName) from the microphone. Check it isn't muted or in use by another app, then try again."
+                if self.audioMode { self.leaveAudioMode() } else { self.cancelDictation() }
+            }
         }
     }
 
@@ -938,9 +1003,7 @@ public final class SmartzVoice {
 
     private func allowLiveWords() async {
         guard Self.canShowLiveWords, SFSpeechRecognizer.authorizationStatus() == .notDetermined else { return }
-        _ = await withCheckedContinuation { (continuation: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
-        }
+        _ = await LiveWords.authorize()
     }
 
     /// Apple's words as they're said, on the device only (nothing is sent to Apple).
@@ -955,8 +1018,7 @@ public final class SmartzVoice {
         request.addsPunctuation = true
         mic.capture.recognize(request)
         self.recognizer = recognizer
-        recognition = recognizer.recognitionTask(with: request) { [weak self] result, _ in
-            guard let text = result?.bestTranscription.formattedString else { return }
+        recognition = LiveWords.task(recognizer, request) { [weak self] text in
             Task { @MainActor in self?.heardLive(text) }
         }
     }
