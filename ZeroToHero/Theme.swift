@@ -1,4 +1,4 @@
-// Asteria 26: aqua on night, heavy for highlights, an aqua-violet-heavy gradient for Asteria Intelligence.
+// Asteria 26: aqua on night, heavy for highlights, an aqua-violet-heavy gradient for Smartz.
 // RULE: tinted text keeps 4.5:1. Pure aqua on white is 1.3:1, so light appearance uses deep aqua #00826B.
 // SF Pro for everything a person reads; Asteria Pixel for the word "Asteria" only.
 // Multiplatform: no UIKit or AppKit type leaks out of this file.
@@ -25,7 +25,7 @@ enum Palette {
     static let night = Color(hex: 0x05080F)
     /// Starlight cream.
     static let cream = Color(hex: 0xE9FBF7)
-    /// Asteria Intelligence moments: aqua into violet into heavy.
+    /// Smartz moments: aqua into violet into heavy.
     static let intelligence = LinearGradient(colors: [Color(hex: 0x00FFD3), Color(hex: 0x7A5CFF), Color(hex: 0xFF0058)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing)
     static let alert = Color(hex: 0xC4432D)

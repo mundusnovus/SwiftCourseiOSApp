@@ -11,7 +11,7 @@ struct ZeroToHeroApp: App {
 
     init() {
         _ = BrandFont.isRegistered
-        AsteriaIntelligence.configure(appName: "Swift: Zero to Hero", privacyURL: URL(string: "https://asteria.technology/privacy/")!)
+        Smartz.configure(appName: "Swift: Zero to Hero", privacyURL: URL(string: "https://asteria.technology/privacy/")!)
         if Records.cloudKitAllowed { CloudSettings.start() }
         let course = Course.app
         let store = LearnerStore.shared
@@ -23,7 +23,7 @@ struct ZeroToHeroApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .asteriaIntelligencePermission()
+                .smartzPermission()
                 .environment(model)
                 .task {
                     #if DEBUG

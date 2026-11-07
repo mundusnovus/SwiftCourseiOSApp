@@ -13,6 +13,8 @@ nonisolated enum IntelligenceEvent: Sendable {
     case reasoning(String)
     case toolCall(index: Int, id: String?, name: String?, arguments: String)
     case usage(prompt: Int, cached: Int, completion: Int, reasoning: Int)
+    /// What the answer cost in Smartz tokens (sent by the gateway after [DONE]).
+    case cost(Double)
 }
 
 actor IntelligenceClient {
@@ -47,9 +49,9 @@ actor IntelligenceClient {
     func reset() { session = nil }
 
     /// Today's tokens.
-    func usage() async throws -> AsteriaUsage.Report {
+    func usage() async throws -> SmartzUsage.Report {
         let data = try await json("GET", "usage", body: nil as [String: String]?)
-        return try Self.decoder.decode(AsteriaUsage.Report.self, from: data)
+        return try Self.decoder.decode(SmartzUsage.Report.self, from: data)
     }
 
     static let decoder: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
@@ -73,11 +75,11 @@ actor IntelligenceClient {
             guard (200..<300).contains(status) else { throw Self.failure(status: status, data: data, response: response) }
             return data
         }
-        throw AsteriaIntelligenceError.unavailable("Asteria Intelligence couldn't start. Try again in a moment.")
+        throw SmartzError.unavailable("Smartz couldn't start. Try again in a moment.")
     }
 
     private func start() async throws -> String {
-        let (configured, developmentKey) = AsteriaIntelligence.settings.withLock { ($0.credential, $0.developmentKey) }
+        let (configured, developmentKey) = Smartz.settings.withLock { ($0.credential, $0.developmentKey) }
         // Apps without their own account code use the shared Asteria Account (AsteriaID).
         let credential = configured ?? { await AsteriaID.shared.accessToken().map { .post($0) } }
         var body: [String: String]
@@ -93,7 +95,7 @@ actor IntelligenceClient {
         } else {
             body = ["kind": "anonymous"]
         }
-        struct Started: Decodable { let token: String; let expiresAt: Date; let usage: AsteriaUsage.Report? }
+        struct Started: Decodable { let token: String; let expiresAt: Date; let usage: SmartzUsage.Report? }
         let started: Started
         do {
             started = try await post("session", body, as: Started.self)
@@ -104,12 +106,12 @@ actor IntelligenceClient {
             started = try await post("session", body, as: Started.self)
         } catch let error where body["kind"] == "account" || body["kind"] == "post" {
             // A sign-in that just expired shouldn't stop the feature: ask as this copy of the app instead.
-            guard !(error is AsteriaIntelligenceError && (error as? AsteriaIntelligenceError) == .offline) else { throw error }
+            guard !(error is SmartzError && (error as? SmartzError) == .offline) else { throw error }
             body = await attestedBody() ?? ["kind": "anonymous"]
             started = try await post("session", body, as: Started.self)
         }
         session = (started.token, started.expiresAt)
-        if let usage = started.usage { await AsteriaUsage.shared.apply(usage) }
+        if let usage = started.usage { await SmartzUsage.shared.apply(usage) }
         return started.token
     }
 
@@ -144,7 +146,7 @@ actor IntelligenceClient {
     // MARK: Requests
 
     private func url(_ path: String) -> URL {
-        AsteriaIntelligence.settings.withLock { $0.server }.appending(path: path)
+        Smartz.settings.withLock { $0.server }.appending(path: path)
     }
 
     private func post<T: Decodable>(_ path: String, _ body: [String: String], as: T.Type) async throws -> T {
@@ -163,18 +165,18 @@ actor IntelligenceClient {
 
     private func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         do { return try await urls.data(for: request) } catch let error as URLError where Self.offline.contains(error.code) {
-            throw AsteriaIntelligenceError.offline
+            throw SmartzError.offline
         }
     }
 
     private static let offline: Set<URLError.Code> = [.notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff]
 
     /// One answer, as events. Starts a new session once if the old one expired.
-    nonisolated func stream(_ body: Data) -> AsyncThrowingStream<IntelligenceEvent, Error> {
+    nonisolated func stream(_ body: Data, context: String? = nil) -> AsyncThrowingStream<IntelligenceEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    try await self.run(body) { continuation.yield($0) }
+                    try await self.run(body, context: context) { continuation.yield($0) }
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -184,17 +186,18 @@ actor IntelligenceClient {
         }
     }
 
-    private func run(_ body: Data, yield: @Sendable (IntelligenceEvent) -> Void) async throws {
+    private func run(_ body: Data, context: String?, yield: @Sendable (IntelligenceEvent) -> Void) async throws {
         for attempt in 0..<2 {
             var request = URLRequest(url: url("chat/completions"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let context { request.setValue(context, forHTTPHeaderField: "X-Smartz-Context") }
             request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             request.setValue("Bearer \(try await token())", forHTTPHeaderField: "Authorization")
             request.httpBody = body
             let bytes: URLSession.AsyncBytes, response: URLResponse
             do { (bytes, response) = try await urls.bytes(for: request) } catch let error as URLError where Self.offline.contains(error.code) {
-                throw AsteriaIntelligenceError.offline
+                throw SmartzError.offline
             }
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             if status == 401 && attempt == 0 { forget(); continue }
@@ -207,17 +210,20 @@ actor IntelligenceClient {
                 try Task.checkCancellation()
                 guard line.hasPrefix("data:") else { continue }
                 let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
-                if payload == "[DONE]" { break }
+                if payload == "[DONE]" { continue }  // the answer's cost follows; the gateway then closes the stream
                 for event in Self.events(in: Data(payload.utf8)) { yield(event) }
             }
             return
         }
-        throw AsteriaIntelligenceError.unavailable("Asteria Intelligence couldn't start. Try again in a moment.")
+        throw SmartzError.unavailable("Smartz couldn't start. Try again in a moment.")
     }
 
     /// The events in one server-sent chunk.
     static func events(in payload: Data) -> [IntelligenceEvent] {
         guard let chunk = try? JSONSerialization.jsonObject(with: payload) as? [String: Any] else { return [] }
+        if let smartz = chunk["smartz"] as? [String: Any], let tokens = (smartz["tokens"] as? Double) ?? (smartz["tokens"] as? Int).map(Double.init) {
+            return [.cost(tokens)]
+        }
         var events: [IntelligenceEvent] = []
         if let choices = chunk["choices"] as? [[String: Any]], let delta = choices.first?["delta"] as? [String: Any] {
             if let reasoning = delta["reasoning_content"] as? String, !reasoning.isEmpty { events.append(.reasoning(reasoning)) }
@@ -236,6 +242,80 @@ actor IntelligenceClient {
         return events
     }
 
+    // MARK: Voice
+
+    /// Smartz reading `body` aloud: 24 kHz 16-bit mono PCM, in chunks of about a tenth of a second as it's made.
+    nonisolated func speech(_ body: Data) -> AsyncThrowingStream<Data, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    try await self.runSpeech(body) { continuation.yield($0) }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func runSpeech(_ body: Data, yield: @Sendable (Data) -> Void) async throws {
+        for attempt in 0..<2 {
+            var request = URLRequest(url: url("smartz/speech"))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(try await token())", forHTTPHeaderField: "Authorization")
+            request.httpBody = body
+            let bytes: URLSession.AsyncBytes, response: URLResponse
+            do { (bytes, response) = try await urls.bytes(for: request) } catch let error as URLError where Self.offline.contains(error.code) {
+                throw SmartzError.offline
+            }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 401 && attempt == 0 { forget(); continue }
+            guard status == 200 else {
+                var data = Data()
+                for try await byte in bytes { data.append(byte); if data.count > 16_384 { break } }
+                throw Self.failure(status: status, data: data, response: response)
+            }
+            var chunk = Data()
+            chunk.reserveCapacity(4_800)
+            for try await byte in bytes {
+                chunk.append(byte)
+                if chunk.count >= 4_800 { yield(chunk); chunk.removeAll(keepingCapacity: true) }
+            }
+            if !chunk.isEmpty { yield(chunk) }
+            return
+        }
+        throw SmartzError.unavailable("Smartz's voice couldn't start. Try again in a moment.")
+    }
+
+    nonisolated struct Heard: Decodable, Sendable { let text: String; let language: String?; let seconds: Double }
+
+    /// What was said in a recording (Scribe).
+    func transcribe(_ audio: Data, contentType: String) async throws -> Heard {
+        for attempt in 0..<2 {
+            var request = URLRequest(url: url("smartz/transcribe"))
+            request.httpMethod = "POST"
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(try await token())", forHTTPHeaderField: "Authorization")
+            let (data, response): (Data, URLResponse)
+            do { (data, response) = try await urls.upload(for: request, from: audio) } catch let error as URLError where Self.offline.contains(error.code) {
+                throw SmartzError.offline
+            }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 401 && attempt == 0 { forget(); continue }
+            guard status == 200 else { throw Self.failure(status: status, data: data, response: response) }
+            return try Self.decoder.decode(Heard.self, from: data)
+        }
+        throw SmartzError.unavailable("Smartz couldn't listen just now. Try again in a moment.")
+    }
+
+    nonisolated struct VoiceList: Decodable, Sendable { let voices: [SmartzVoiceOption]; let defaultVoice: String? }
+
+    func voices() async throws -> VoiceList {
+        try Self.decoder.decode(VoiceList.self, from: await json("GET", "smartz/voices", body: nil as [String: String]?))
+    }
+
     /// The gateway's refusal as the error FoundationModels apps already handle.
     static func failure(status: Int, data: Data, response: URLResponse) -> Error {
         struct Body: Decodable { struct Inner: Decodable { let message: String? }; let error: Inner? }
@@ -243,12 +323,12 @@ actor IntelligenceClient {
         switch status {
         case 429:
             let daily = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "X-Asteria-Limit") == "daily"
-            return LanguageModelErrorBridge.rateLimited(message.isEmpty ? "Asteria Intelligence is busy. Try again in a moment." : message,
+            return LanguageModelErrorBridge.rateLimited(message.isEmpty ? "Smartz is busy. Try again in a moment." : message,
                                                         resets: daily ? IntelligenceClient.nextMidnightUTC() : nil)
         case 413: return LanguageModelErrorBridge.tooLong(message)
-        case 403: return AsteriaIntelligenceError.unavailable(message.isEmpty ? "This copy of the app couldn't be verified." : message)
-        case 503, 502: return AsteriaIntelligenceError.unavailable(message.isEmpty ? "Asteria Intelligence is busy. Try again in a moment." : message)
-        default: return AsteriaIntelligenceError.failed(message.isEmpty ? "Asteria Intelligence couldn't finish that. Try again in a moment." : message)
+        case 403: return SmartzError.unavailable(message.isEmpty ? "This copy of the app couldn't be verified." : message)
+        case 503, 502: return SmartzError.unavailable(message.isEmpty ? "Smartz is busy. Try again in a moment." : message)
+        default: return SmartzError.failed(message.isEmpty ? "Smartz couldn't finish that. Try again in a moment." : message)
         }
     }
 
@@ -264,7 +344,7 @@ nonisolated enum LanguageModelErrorBridge {
         LanguageModelError.rateLimited(.init(resetDate: resets, debugDescription: message))
     }
     static func tooLong(_ message: String) -> Error {
-        LanguageModelError.contextSizeExceeded(.init(contextSize: AsteriaIntelligence.contextSize, tokenCount: 0,
-                                                     debugDescription: message.isEmpty ? "That's more than Asteria Intelligence can read at once." : message))
+        LanguageModelError.contextSizeExceeded(.init(contextSize: Smartz.contextSize, tokenCount: 0,
+                                                     debugDescription: message.isEmpty ? "That's more than Smartz can read at once." : message))
     }
 }

@@ -1,6 +1,6 @@
 // Asteria in Swift: Zero to Hero: the assistant in every Asteria app, here with the open lesson in view. She explains,
 // answers questions and gives hints; the tests stay the judge, and she never hands over a whole solution. The chat
-// follows the Asteria Account into every Asteria app (Intelligence/AsteriaIntelligenceChat).
+// follows the Asteria Account into every Asteria app (Intelligence/SmartzChat.swift).
 import SwiftUI
 import ZeroToHeroKit
 
@@ -9,8 +9,8 @@ enum ZTHChats {
     /// The lesson open now, if any.
     static var openLesson: Lesson?
 
-    static let asteria = AsteriaChats(agent: .asteria(
-        greeting: "Hi, I'm Asteria. Ask me anything about Swift, or about the lesson you're on.",
+    static let smartz = SmartzChats(agent: .smartz(
+        greeting: "Hi, I'm Smartz. Ask me anything about Swift, or about the lesson you're on.",
         suggestions: ["Explain this lesson another way", "What's the difference between let and var?", "Give me a small practice idea"],
         context: { _ in await ZTHChats.lessonContext() }))
 
@@ -33,8 +33,8 @@ struct ZTHAsteriaSheet: View {
 
     var body: some View {
         NavigationStack {
-            AsteriaChatView(chats: ZTHChats.asteria) { signingIn = true }
-                .navigationTitle("Asteria")
+            SmartzChatView(chats: ZTHChats.smartz) { signingIn = true }
+                .navigationTitle("Smartz")
                 #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
                 #endif

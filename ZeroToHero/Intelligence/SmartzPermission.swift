@@ -1,6 +1,6 @@
-// Asking once before anything goes to Asteria Intelligence, and the switch in each app's settings.
+// Asking once before anything goes to Smartz, and the switch in each app's settings.
 //
-// Put `.asteriaIntelligencePermission()` on the app's root view. The first time a session asks Asteria Intelligence
+// Put `.smartzPermission()` on the app's root view. The first time a session asks Smartz
 // for anything while the app is open, the sheet appears and the request waits for the answer. With no sheet on
 // screen (the app is in the background, or nothing hosts it), nothing is sent.
 import Foundation
@@ -13,8 +13,8 @@ import AppKit
 #endif
 
 @MainActor @Observable
-public final class AsteriaIntelligencePrompt {
-    public static let shared = AsteriaIntelligencePrompt()
+public final class SmartzPrompt {
+    public static let shared = SmartzPrompt()
 
     public var isPresented = false
     /// Changes whenever the permission does, so views that show it refresh.
@@ -24,7 +24,7 @@ public final class AsteriaIntelligencePrompt {
 
     /// True when the person has said yes; asks them if they haven't been asked and can be.
     public nonisolated static func ensurePermission() async -> Bool {
-        switch AsteriaIntelligence.permission {
+        switch Smartz.permission {
         case .granted: return true
         case .declined: return false
         case .notAsked: return await shared.ask()
@@ -41,7 +41,7 @@ public final class AsteriaIntelligencePrompt {
 
     /// The person's answer, from the sheet or from Settings.
     public func set(_ allowed: Bool) {
-        AsteriaIntelligence.permission = allowed ? .granted : .declined
+        Smartz.permission = allowed ? .granted : .declined
         revision += 1
         isPresented = false
         let resumed = waiting
@@ -68,19 +68,19 @@ public final class AsteriaIntelligencePrompt {
 }
 
 public extension View {
-    /// Hosts the one-time Asteria Intelligence permission sheet. Put it on the app's root view.
-    func asteriaIntelligencePermission() -> some View { modifier(AsteriaIntelligencePermissionHost()) }
+    /// Hosts the one-time Smartz permission sheet. Put it on the app's root view.
+    func smartzPermission() -> some View { modifier(SmartzPermissionHost()) }
 }
 
-struct AsteriaIntelligencePermissionHost: ViewModifier {
-    @Bindable private var prompt = AsteriaIntelligencePrompt.shared
+struct SmartzPermissionHost: ViewModifier {
+    @Bindable private var prompt = SmartzPrompt.shared
 
     func body(content: Content) -> some View {
         content
             .onAppear { prompt.hosts += 1 }
             .onDisappear { prompt.hosts -= 1 }
             .sheet(isPresented: $prompt.isPresented, onDismiss: { prompt.dismissedWithoutAnswer() }) {
-                AsteriaIntelligenceConsentView()
+                SmartzConsentView()
                     #if os(macOS)
                     .frame(width: 460)
                     #endif
@@ -90,8 +90,8 @@ struct AsteriaIntelligencePermissionHost: ViewModifier {
     }
 }
 
-/// What Asteria Intelligence is and where requests go, with Turn On and Not Now.
-public struct AsteriaIntelligenceConsentView: View {
+/// What Smartz is and where requests go, with Turn On and Not Now.
+public struct SmartzConsentView: View {
     @Environment(\.openURL) private var openURL
 
     public init() {}
@@ -105,19 +105,19 @@ public struct AsteriaIntelligenceConsentView: View {
                             .font(.system(size: 40, weight: .semibold))
                             .foregroundStyle(.tint)
                             .accessibilityHidden(true)
-                        Text("Asteria Intelligence")
+                        Text("Smartz")
                             .font(.largeTitle.bold())
-                        Text("Frontier AI, built into \(AsteriaIntelligence.appName).")
+                        Text("Smartz by Asteria, built into \(Smartz.appName).")
                             .font(.title3)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.top, 36)
                     Row(symbol: "arrow.up.message",
-                        text: "When you use it, what you ask and anything you share with it, like a page, a chat or a photo, is sent to Asteria Technology and answered by our AI provider, which processes requests in China.")
+                        text: "When you use it, what you ask and anything you share with it, like a page, a chat or a photo, goes to Asteria and is answered by our AI provider, DeepInfra, in the United States. With voice, what you say and what Smartz says go to ElevenLabs.")
                     Row(symbol: "hand.raised",
-                        text: "We don't keep or log what you send. Our AI provider may keep it and use it to improve its services, under its own terms. Leave out anything you wouldn't want stored.")
-                    Row(symbol: "switch.2", text: "You can turn Asteria Intelligence off at any time in Settings.")
-                    Button("Privacy Policy") { openURL(AsteriaIntelligence.privacyURL) }
+                        text: "DeepInfra and ElevenLabs keep nothing you send. Asteria keeps your chats only when you sign in, sealed, so they follow you; what Smartz learns about you stays private unless you choose to share it.")
+                    Row(symbol: "switch.2", text: "You can turn Smartz off at any time in Settings.")
+                    Button("Privacy Policy") { openURL(Smartz.privacyURL) }
                         .font(.callout)
                 }
                 .padding(.horizontal, 28)
@@ -125,12 +125,12 @@ public struct AsteriaIntelligenceConsentView: View {
                 .frame(maxWidth: .infinity)
             }
             VStack(spacing: 10) {
-                Button { AsteriaIntelligencePrompt.shared.set(true) } label: {
-                    Text("Turn On Asteria Intelligence").frame(maxWidth: .infinity)
+                Button { SmartzPrompt.shared.set(true) } label: {
+                    Text("Turn On Smartz").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                Button("Not Now") { AsteriaIntelligencePrompt.shared.set(false) }
+                Button("Not Now") { SmartzPrompt.shared.set(false) }
                     .controlSize(.large)
             }
             .padding(.horizontal, 28)
@@ -157,20 +157,20 @@ public struct AsteriaIntelligenceConsentView: View {
 }
 
 /// The switch for an app's settings: a Form section with the toggle, a line on where requests go, and the policy.
-public struct AsteriaIntelligenceSettingsSection: View {
-    private var prompt = AsteriaIntelligencePrompt.shared
+public struct SmartzSettingsSection: View {
+    private var prompt = SmartzPrompt.shared
 
     public init() {}
 
     public var body: some View {
         let _ = prompt.revision
         Section {
-            Toggle(isOn: Binding(get: { AsteriaIntelligence.isOn }, set: { prompt.set($0) })) {
-                Label("Asteria Intelligence", systemImage: "sparkles")
+            Toggle(isOn: Binding(get: { Smartz.isOn }, set: { prompt.set($0) })) {
+                Label("Smartz", systemImage: "sparkles")
             }
-            Link("Privacy Policy", destination: AsteriaIntelligence.privacyURL)
+            Link("Privacy Policy", destination: Smartz.privacyURL)
         } footer: {
-            Text("Answers come from a large AI model. What you ask and share with it is sent to Asteria Technology and processed by our AI provider in China, which may keep it under its own terms. Asteria Technology doesn't keep it.")
+            Text("Answers come from a large AI model run by our AI provider, DeepInfra, in the United States; voice is by ElevenLabs. Neither keeps what you send.")
         }
     }
 }

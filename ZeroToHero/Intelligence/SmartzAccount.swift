@@ -1,6 +1,6 @@
 // The Asteria Account in every Asteria app: sign in with a username and password (the plain username, like "maya";
 // the account lives on Asteria Post's server as maya.post.asteria.technology), or make one, with no invite code. The
-// account carries the person's Asteria tokens (The Asteria Subscription) and their Asteria chats into every app.
+// account carries the person's Smartz tokens (The Smartz Subscription) and their chats with Smartz into every app.
 //
 // Signing in once signs in every Asteria app on the device: the app that has the password makes a sign-in for each of
 // the others and leaves it in the shared Keychain group, and each takes its own on its next launch. (Each app needs
@@ -120,7 +120,7 @@ public final class AsteriaID {
     public func signOut() {
         session = nil
         Keychain.write(nil, Self.ownItem)
-        AsteriaIntelligence.accountChanged()
+        Smartz.accountChanged()
     }
 
     /// Deletes the Asteria Account everywhere: Asteria, Post, every app's sign-in, tokens and chats. Needs the
@@ -134,7 +134,7 @@ public final class AsteriaID {
         signOut()
     }
 
-    /// A current access token for Asteria Intelligence, refreshed when it's about to expire. Nil when signed out or
+    /// A current access token for Smartz, refreshed when it's about to expire. Nil when signed out or
     /// the sign-in has ended.
     public func accessToken() async -> String? {
         guard let session else { return nil }
@@ -168,7 +168,7 @@ public final class AsteriaID {
         session.service = Self.server.absoluteString
         self.session = session
         Keychain.writeJSON(session, Self.ownItem)
-        if announce { AsteriaIntelligence.accountChanged() }
+        if announce { Smartz.accountChanged() }
     }
 
     /// Makes a sign-in for each other Asteria app on this device (Post too) and leaves it in the shared Keychain, so

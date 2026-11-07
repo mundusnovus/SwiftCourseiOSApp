@@ -74,8 +74,8 @@ struct RootView: View {
     }
 
     private var intelligenceMenu: some View {
-        Menu("Asteria Intelligence", systemImage: "sparkles") {
-            Button("Ask Asteria", systemImage: "sparkle") { showAsteria = true }
+        Menu("Smartz", systemImage: "sparkles") {
+            Button("Ask Smartz", systemImage: "sparkle") { showAsteria = true }
             Button("Plan My Week", systemImage: "calendar") { model.showPlan = true }
             Button("Make a Lesson", systemImage: "text.badge.plus") { model.showStudy = true }
         }

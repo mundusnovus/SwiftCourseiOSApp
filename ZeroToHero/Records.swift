@@ -364,7 +364,7 @@ final class LearnerStore {
         save()
     }
 
-    /// Forgets lessons, code, ticks, streaks and badges. Lessons the person made with Asteria Intelligence are theirs and
+    /// Forgets lessons, code, ticks, streaks and badges. Lessons the person made with Smartz are theirs and
     /// stay; they can delete those one by one.
     func resetAll() {
         for record in records.values { context.delete(record) }

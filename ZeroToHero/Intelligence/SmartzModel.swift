@@ -1,4 +1,4 @@
-// The Asteria Intelligence language model for FoundationModels. A session hands the executor its whole transcript
+// The Smartz language model for FoundationModels. A session hands the executor its whole transcript
 // (instructions, prompts, answers, tool calls and their outputs, reasoning); the executor turns it into a Chat
 // Completions request, sends it to Asteria's gateway, and streams the answer back as text, reasoning and tool calls.
 // The session runs the tools and parses @Generable answers itself, exactly as it does with Apple's models.
@@ -8,35 +8,49 @@ import FoundationModels
 import ImageIO
 import UniformTypeIdentifiers
 
-nonisolated public struct AsteriaIntelligenceModel: LanguageModel {
-    public typealias Executor = AsteriaIntelligenceExecutor
+nonisolated public struct SmartzModel: LanguageModel {
+    public typealias Executor = SmartzExecutor
 
-    public init() {}
+    /// "chat" for a conversation with Smartz: the gateway adds what Smartz knows (the person's memories, shared skills).
+    public var context: String?
+    /// Think harder: reasoning on for every answer, unless the session asks for a level itself.
+    public var thinkHarder: Bool
+
+    public init(context: String? = nil, thinkHarder: Bool = false) {
+        self.context = context
+        self.thinkHarder = thinkHarder
+    }
 
     public var capabilities: LanguageModelCapabilities { LanguageModelCapabilities([.toolCalling, .guidedGeneration, .vision, .reasoning]) }
 
-    public var executorConfiguration: AsteriaIntelligenceExecutor.Configuration { .init() }
+    public var executorConfiguration: SmartzExecutor.Configuration { .init(context: context, thinkHarder: thinkHarder) }
 
     /// Images are the only attachments it reads.
     public func supportsDataAttachmentType(_ type: UTType) async throws -> Bool { type.conforms(to: .image) }
 }
 
-nonisolated public struct AsteriaIntelligenceExecutor: LanguageModelExecutor {
-    public struct Configuration: Hashable, Sendable { public init() {} }
-    public typealias Model = AsteriaIntelligenceModel
+nonisolated public struct SmartzExecutor: LanguageModelExecutor {
+    public struct Configuration: Hashable, Sendable {
+        public var context: String?
+        public var thinkHarder: Bool
+        public init(context: String? = nil, thinkHarder: Bool = false) { self.context = context; self.thinkHarder = thinkHarder }
+    }
+    public typealias Model = SmartzModel
 
-    public init(configuration: Configuration) throws {}
+    let configuration: Configuration
+
+    public init(configuration: Configuration) throws { self.configuration = configuration }
 
     /// Starts the gateway session early, so the first answer doesn't wait for it.
-    public func prewarm(model: AsteriaIntelligenceModel, transcript: Transcript) {
-        guard AsteriaIntelligence.isOn else { return }
+    public func prewarm(model: SmartzModel, transcript: Transcript) {
+        guard Smartz.isOn else { return }
         Task { try? await IntelligenceClient.shared.token() }
     }
 
-    nonisolated(nonsending) public func respond(to request: LanguageModelExecutorGenerationRequest, model: AsteriaIntelligenceModel,
+    nonisolated(nonsending) public func respond(to request: LanguageModelExecutorGenerationRequest, model: SmartzModel,
                                                 streamingInto channel: LanguageModelExecutorGenerationChannel) async throws {
-        guard await AsteriaIntelligencePrompt.ensurePermission() else { throw AsteriaIntelligenceError.notAllowed }
-        let body = try IntelligenceRequest.body(for: request)
+        guard await SmartzPrompt.ensurePermission() else { throw SmartzError.notAllowed }
+        let body = try IntelligenceRequest.body(for: request, thinkHarder: configuration.thinkHarder)
         let structured = request.schema != nil
         // A structured answer is buffered and sent whole: it must be one JSON object, and the provider occasionally
         // returns a blank one, which is worth one retry.
@@ -45,7 +59,7 @@ nonisolated public struct AsteriaIntelligenceExecutor: LanguageModelExecutor {
             var reasoningTokens = 0
             var calls: [Int: (id: String, name: String, arguments: String)] = [:]
             var usage: (prompt: Int, cached: Int, completion: Int, reasoning: Int)?
-            for try await event in IntelligenceClient.shared.stream(body) {
+            for try await event in IntelligenceClient.shared.stream(body, context: configuration.context) {
                 try Task.checkCancellation()
                 switch event {
                 case .text(let delta):
@@ -63,6 +77,8 @@ nonisolated public struct AsteriaIntelligenceExecutor: LanguageModelExecutor {
                     calls[index] = call
                 case .usage(let prompt, let cached, let completion, let reasoning):
                     usage = (prompt, cached, completion, reasoning)
+                case .cost(let tokens):
+                    await SmartzUsage.shared.noteAnswer(tokens: tokens)
                 }
             }
             if structured {
@@ -76,7 +92,7 @@ nonisolated public struct AsteriaIntelligenceExecutor: LanguageModelExecutor {
                 await channel.send(.toolCalls(action: .toolCall(id: call.id, name: call.name,
                                                                 action: .appendArguments(arguments, tokenCount: IntelligenceRequest.tokens(arguments)))))
             }
-            Task { await AsteriaUsage.shared.refresh() }
+            Task { await SmartzUsage.shared.refresh() }
             if let usage {
                 await channel.send(.response(action: .updateUsage(
                     input: .init(totalTokenCount: usage.prompt, cachedTokenCount: usage.cached),
@@ -93,7 +109,7 @@ nonisolated enum IntelligenceRequest {
     static func tokens(_ text: String) -> Int { max(1, text.utf8.count / 4) }
 
     /// The request body for one turn.
-    static func body(for request: LanguageModelExecutorGenerationRequest) throws -> Data {
+    static func body(for request: LanguageModelExecutorGenerationRequest, thinkHarder: Bool = false) throws -> Data {
         var messages = try messages(from: request.transcript)
         if let schema = request.schema {
             let json = String(decoding: try JSONEncoder().encode(schema), as: UTF8.self)
@@ -119,6 +135,7 @@ nonisolated enum IntelligenceRequest {
         default: break
         }
         switch request.contextOptions.reasoningLevel {
+        case nil where thinkHarder: body["thinking"] = ["type": "enabled"]; body["reasoning_effort"] = "high"
         case nil: body["thinking"] = ["type": "disabled"]
         case .light?: body["thinking"] = ["type": "enabled"]; body["reasoning_effort"] = "low"
         case .moderate?: body["thinking"] = ["type": "enabled"]; body["reasoning_effort"] = "high"

@@ -1,31 +1,33 @@
-// Asteria Intelligence: Asteria Technology's AI, the same in every Asteria app. It is a FoundationModels language model
-// (AsteriaIntelligenceModel), so apps use it exactly like Apple's: LanguageModelSession, tools, @Generable answers,
-// streaming. Requests go to Asteria's gateway at asteria.technology/intelligence, which holds the model provider's key.
+// Smartz: Asteria Technology's AI, the same in every Asteria app. It is a FoundationModels language model
+// (SmartzModel), so apps use it exactly like Apple's: LanguageModelSession, tools, @Generable answers,
+// streaming. Requests go to Asteria's gateway at asteria.technology/intelligence, which holds the model provider's key
+// (DeepInfra, in the US). Voice is ElevenLabs, through the same gateway (SmartzVoice.swift).
 //
-// The shared files are AsteriaIntelligence*.swift in Asteria Search. Asteria, Post and Food and Mood keep copies
+// The shared files are Smartz*.swift in Asteria Search (SmartzAccount.swift is the Asteria Account). Smartz, Post, Food and Mood, Box and
+// Swift: Zero to Hero keep copies
 // (their tools/sync-intelligence.sh); Browse uses the package.
 //
-// Before anything is sent, the person says yes once (AsteriaIntelligencePermission.swift), as App Review guideline
+// Before anything is sent, the person says yes once (SmartzPermission.swift), as App Review guideline
 // 5.1.2(i) asks of apps that share data with an AI service. An app that never asked can't send anything.
 import Foundation
 import FoundationModels
 import Synchronization
 
-/// Whether Asteria Intelligence can answer right now, in words a person can act on.
+/// Whether Smartz can answer right now, in words a person can act on.
 nonisolated public enum IntelligenceStatus: Sendable, Equatable {
     case available, needsPermission, turnedOff, unavailable
 
     public var explanation: String {
         switch self {
         case .available: "Ready"
-        case .needsPermission: "Turn on Asteria Intelligence to use this."
-        case .turnedOff: "Asteria Intelligence is off. Turn it on in Settings to use this."
-        case .unavailable: "Asteria Intelligence isn't available right now."
+        case .needsPermission: "Turn on Smartz to use this."
+        case .turnedOff: "Smartz is off. Turn it on in Settings to use this."
+        case .unavailable: "Smartz isn't available right now."
         }
     }
 }
 
-nonisolated public enum AsteriaIntelligence {
+nonisolated public enum Smartz {
     /// How an app with an account proves who is asking, so the person's daily allowance follows them across apps.
     /// Apps without one are checked with App Attest instead.
     public enum Credential: Sendable {
@@ -37,7 +39,7 @@ nonisolated public enum AsteriaIntelligence {
 
     struct Settings: Sendable {
         var server = URL(string: "https://asteria.technology/intelligence/v1")!
-        var appName = "Asteria"
+        var appName = "Smartz"
         var privacyURL = URL(string: "https://asteria.technology/privacy/")!
         var credential: (@Sendable () async -> Credential?)?
         var developmentKey: String?
@@ -70,15 +72,18 @@ nonisolated public enum AsteriaIntelligence {
     public static func accountChanged() {
         Task {
             await IntelligenceClient.shared.reset()
-            await AsteriaUsage.shared.refresh()
+            await SmartzUsage.shared.refresh()
             await MainActor.run { NotificationCenter.default.post(name: accountDidChange, object: nil) }
         }
     }
 
     public static let accountDidChange = Notification.Name("AsteriaIntelligence.accountDidChange")
 
-    /// The model, for `LanguageModelSession(model: AsteriaIntelligence.model, …)`.
-    public static var model: AsteriaIntelligenceModel { AsteriaIntelligenceModel() }
+    /// The model, for `LanguageModelSession(model: Smartz.model, …)`.
+    public static var model: SmartzModel { SmartzModel() }
+
+    /// The model for a conversation with Smartz: the gateway adds what Smartz knows about the person.
+    public static func chatModel(thinkHarder: Bool = false) -> SmartzModel { SmartzModel(context: "chat", thinkHarder: thinkHarder) }
 
     /// How much an app should put in one request. The model reads far more; this keeps answers quick and the daily
     /// allowance from going in one long chat.
@@ -120,40 +125,54 @@ nonisolated public enum AsteriaIntelligence {
         return Locale.Language(identifier: "en_US").isEquivalent(to: locale.language) ? "" : " The person's locale is \(locale.identifier)."
     }
 
-    /// A sentence for any error from a session using Asteria Intelligence.
+    /// A sentence for any error from a session using Smartz.
     public static func message(for error: Error) -> String {
-        if let error = error as? AsteriaIntelligenceError { return error.localizedDescription }
+        if let error = error as? SmartzError { return error.localizedDescription }
         if let error = error as? LanguageModelError {
             switch error {
-            case .rateLimited(let limited): return limited.debugDescription.isEmpty ? "Asteria Intelligence is busy. Try again in a moment." : limited.debugDescription
-            case .contextSizeExceeded: return "That's more than Asteria Intelligence can read at once."
-            case .guardrailViolation, .refusal: return "Asteria Intelligence won't help with that one."
+            case .rateLimited(let limited): return limited.debugDescription.isEmpty ? "Smartz is busy. Try again in a moment." : limited.debugDescription
+            case .contextSizeExceeded: return "That's more than Smartz can read at once."
+            case .guardrailViolation, .refusal: return "Smartz won't help with that one."
             case .timeout: return "That took too long. Try again?"
-            default: return "Asteria Intelligence couldn't finish that. Try again in a moment."
+            default: return "Smartz couldn't finish that. Try again in a moment."
             }
         }
-        if String(describing: error).contains("decodingFailure") { return "Asteria Intelligence's answer didn't come out right. Try again?" }
+        if String(describing: error).contains("decodingFailure") { return "Smartz's answer didn't come out right. Try again?" }
         if error is CancellationError { return "Stopped." }
-        if (error as? URLError)?.code == .notConnectedToInternet { return AsteriaIntelligenceError.offline.localizedDescription }
-        return "Asteria Intelligence couldn't finish that. Try again in a moment."
+        if (error as? URLError)?.code == .notConnectedToInternet { return SmartzError.offline.localizedDescription }
+        return "Smartz couldn't finish that. Try again in a moment."
     }
 }
 
-/// Today's Asteria tokens: one token is a cent of Asteria Intelligence. Signed-in accounts get their tier's tokens
-/// (The Asteria Subscription); apps without an account get a per-device allowance.
+/// Today's Smartz tokens: one token is a cent of Smartz. Signed-in accounts get their tier's tokens
+/// (The Smartz Subscription); apps without an account get a per-device allowance.
 @MainActor @Observable
-public final class AsteriaUsage {
-    public static let shared = AsteriaUsage()
+public final class SmartzUsage {
+    public static let shared = SmartzUsage()
 
     public private(set) var tokensPerDay = 0
-    public private(set) var tokensUsed = 0
+    /// Today's use as the gateway last said, plus what answers have cost since (to the cent).
+    private var used: Double = 0
+    public var tokensUsed: Int { Int(used.rounded(.up)) }
     public private(set) var signedIn = false
     public private(set) var tier: String?
     public private(set) var tierName: String?
     public private(set) var resetsAt: Date?
     public private(set) var known = false
 
-    public var tokensLeft: Int { max(0, tokensPerDay - tokensUsed) }
+    public var tokensLeft: Int { max(0, Int((Double(tokensPerDay) - used).rounded(.down))) }
+    /// Most of today's tokens are gone (80% or more): time for a heads-up, never a surprise.
+    public var runningLow: Bool { known && tokensPerDay > 0 && used * 5 >= Double(tokensPerDay) * 4 }
+    /// What the last answer cost, in Smartz tokens.
+    public private(set) var lastAnswerTokens: Double?
+    /// Everything answers have cost since launch, so a chat can tell what one reply cost (tool calls included).
+    public private(set) var answerTokens: Double = 0
+
+    func noteAnswer(tokens: Double) {
+        lastAnswerTokens = tokens
+        answerTokens += tokens
+        used += tokens
+    }
 
     nonisolated struct Report: Decodable, Sendable {
         let tokensPerDay: Int?
@@ -166,7 +185,7 @@ public final class AsteriaUsage {
 
     func apply(_ report: Report) {
         tokensPerDay = report.tokensPerDay ?? tokensPerDay
-        tokensUsed = report.tokensUsed ?? tokensUsed
+        if let reported = report.tokensUsed { used = Double(reported) }
         signedIn = report.signedIn ?? signedIn
         tier = report.tier
         tierName = report.tierName
@@ -174,14 +193,14 @@ public final class AsteriaUsage {
         known = report.tokensPerDay != nil
     }
 
-    /// Asks the gateway (after the person has turned Asteria Intelligence on).
+    /// Asks the gateway (after the person has turned Smartz on).
     public func refresh() async {
-        guard AsteriaIntelligence.isOn, let report = try? await IntelligenceClient.shared.usage() else { return }
+        guard Smartz.isOn, let report = try? await IntelligenceClient.shared.usage() else { return }
         apply(report)
     }
 }
 
-nonisolated public enum AsteriaIntelligenceError: LocalizedError, Sendable, Equatable {
+nonisolated public enum SmartzError: LocalizedError, Sendable, Equatable {
     /// The person hasn't said yes (or turned it off).
     case notAllowed
     case offline
@@ -190,8 +209,8 @@ nonisolated public enum AsteriaIntelligenceError: LocalizedError, Sendable, Equa
 
     public var errorDescription: String? {
         switch self {
-        case .notAllowed: "Asteria Intelligence is off. Turn it on in Settings to use this."
-        case .offline: "Asteria Intelligence needs an internet connection."
+        case .notAllowed: "Smartz is off. Turn it on in Settings to use this."
+        case .offline: "Smartz needs an internet connection."
         case .unavailable(let message), .failed(let message): message
         }
     }

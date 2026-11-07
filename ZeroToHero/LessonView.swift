@@ -522,7 +522,7 @@ struct CodeLessonView: View {
 
             if let result, !result.passed, !result.unsupported {
                 Button { showCoach = true } label: {
-                    Label(result.compiled ? "Why doesn't it pass? Ask the coach" : "Explain this error with Asteria Intelligence",
+                    Label(result.compiled ? "Why doesn't it pass? Ask the coach" : "Explain this error with Smartz",
                           systemImage: "sparkles")
                         .frame(maxWidth: .infinity)
                 }

@@ -26,7 +26,7 @@ final class AppModel {
     var showAchievements = false
     var showStudy = false
     var showPlan = false
-    /// A lesson the person kept from Asteria Intelligence. Shown in the detail column instead of a course lesson.
+    /// A lesson the person kept from Smartz. Shown in the detail column instead of a course lesson.
     var customSelection: PersistentIdentifier?
 
     init(course: Course, store: LearnerStore = .shared) {

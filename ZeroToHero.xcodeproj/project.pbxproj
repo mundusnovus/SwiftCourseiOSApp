@@ -161,13 +161,15 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/ZeroToHero-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/ZeroToHero-macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = KZFR2T5L2A;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Zero to Hero";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Swift: Zero to Hero uses the microphone when you talk to Smartz.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Swift: Zero to Hero shows your words on screen while you talk to Smartz, on this device.";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Asteria Technology";
@@ -184,7 +186,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 27.2;
+				MARKETING_VERSION = 27.2.5;
 				PRODUCT_BUNDLE_IDENTIFIER = technology.asteria.zerotohero;
 				PRODUCT_NAME = "Swift Zero to Hero";
 				SDKROOT = auto;
@@ -205,13 +207,15 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/ZeroToHero-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/ZeroToHero-macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = KZFR2T5L2A;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Zero to Hero";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Swift: Zero to Hero uses the microphone when you talk to Smartz.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Swift: Zero to Hero shows your words on screen while you talk to Smartz, on this device.";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Asteria Technology";
@@ -228,7 +232,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 27.2;
+				MARKETING_VERSION = 27.2.5;
 				PRODUCT_BUNDLE_IDENTIFIER = technology.asteria.zerotohero;
 				PRODUCT_NAME = "Swift Zero to Hero";
 				SDKROOT = auto;

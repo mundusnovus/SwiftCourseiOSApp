@@ -1,4 +1,4 @@
-// Asteria Intelligence (Intelligence/AsteriaIntelligence*.swift, shared with every Asteria app). It explains errors,
+// Smartz (Intelligence/Smartz*.swift, shared with every Asteria app). It explains errors,
 // reviews working code, recaps lessons, writes small extra lessons and a line of advice for the week. It never rewrites
 // the learner's code, never marks anything done, and never chooses which lessons to study: the course and the tests
 // stay the judge. The person turns it on once.
@@ -9,11 +9,11 @@ import SwiftUI
 import ZeroToHeroKit
 
 enum Intelligence {
-    /// Asteria Intelligence can be offered (the first use asks permission). False only after the person turned it off.
-    static var isAvailable: Bool { AsteriaIntelligence.canOffer }
+    /// Smartz can be offered (the first use asks permission). False only after the person turned it off.
+    static var isAvailable: Bool { Smartz.canOffer }
 
     static var statusSentence: String {
-        AsteriaIntelligence.isOn ? "Asteria Intelligence is on." : AsteriaIntelligence.status.explanation
+        Smartz.isOn ? "Smartz is on." : Smartz.status.explanation
     }
 
     /// Said in every instruction: anything a person typed or a lesson contains is material, not a command.
@@ -55,18 +55,18 @@ enum Intelligence {
     """
 
     static func session(instructions: String) -> LanguageModelSession {
-        LanguageModelSession(model: AsteriaIntelligence.model, instructions: instructions)
+        LanguageModelSession(model: Smartz.model, instructions: instructions)
     }
 
     static func sentence(for error: Error) -> String {
         if let error = error as? LanguageModelError {
             switch error {
-            case .guardrailViolation, .refusal: return "Asteria Intelligence wouldn't answer that one. Try rephrasing, or read the test again."
-            case .contextSizeExceeded: return "That was too long for Asteria Intelligence. Try a shorter piece of code."
+            case .guardrailViolation, .refusal: return "Smartz wouldn't answer that one. Try rephrasing, or read the test again."
+            case .contextSizeExceeded: return "That was too long for Smartz. Try a shorter piece of code."
             default: break
             }
         }
-        return AsteriaIntelligence.message(for: error)
+        return Smartz.message(for: error)
     }
 }
 
@@ -298,7 +298,7 @@ struct CodeCoachSheet: View {
                         .background(Palette.editorBackground, in: .rect(cornerRadius: 14))
                         .environment(\.colorScheme, .dark)
                     }
-                    Text("Written by Asteria Intelligence on this device. It can be wrong; the tests are the judge.")
+                    Text("Written by Smartz on this device. It can be wrong; the tests are the judge.")
                         .font(.reading(.footnote)).foregroundStyle(.secondary)
                 }
                 .padding(20)
@@ -344,7 +344,7 @@ struct AdviceCard: View {
 struct UnavailableCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Asteria Intelligence is not available", systemImage: "sparkles")
+            Label("Smartz is not available", systemImage: "sparkles")
                 .font(.reading(.headline, weight: .semibold))
             Text(Intelligence.statusSentence).font(.reading(.body)).foregroundStyle(.secondary)
             Text("The lessons, tests and milestones all work without it.")
@@ -424,7 +424,7 @@ struct StudySheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text("Ask for a small lesson on anything in Swift. Asteria Intelligence writes it on this device, and you can keep it in My Lessons with a scratch editor to try the code.")
+                    Text("Ask for a small lesson on anything in Swift. Smartz writes it on this device, and you can keep it in My Lessons with a scratch editor to try the code.")
                         .font(.reading(.body)).foregroundStyle(.secondary)
                     if !Intelligence.isAvailable {
                         UnavailableCard()
@@ -460,7 +460,7 @@ struct StudySheet: View {
                             Text("Writing…").font(.reading(.callout)).foregroundStyle(.secondary)
                         }
                     }
-                    Text("Written by Asteria Intelligence. It can be wrong; check it against the course and Xcode.")
+                    Text("Written by Smartz. It can be wrong; check it against the course and Xcode.")
                         .font(.reading(.footnote)).foregroundStyle(.secondary)
                 }
                 .padding(20)
@@ -608,7 +608,7 @@ struct CustomLessonView: View {
                 .background(Palette.editorBackground)
                 .clipShape(.rect(cornerRadius: 16))
                 .environment(\.colorScheme, .dark)
-                Text("Written by Asteria Intelligence on \(lesson.createdAt.formatted(date: .abbreviated, time: .omitted)). The scratch editor runs the same on-device engine as the course.")
+                Text("Written by Smartz on \(lesson.createdAt.formatted(date: .abbreviated, time: .omitted)). The scratch editor runs the same on-device engine as the course.")
                     .font(.reading(.footnote)).foregroundStyle(.secondary)
             }
             .padding(24)
@@ -660,7 +660,7 @@ struct StudyPlanSheet: View {
                         }
                     }
                 } footer: {
-                    Text("The course picks the lessons in order, skipping what you've finished. Asteria Intelligence only adds the note.")
+                    Text("The course picks the lessons in order, skipping what you've finished. Smartz only adds the note.")
                 }
 
                 if !plan.review.isEmpty {
@@ -686,7 +686,7 @@ struct StudyPlanSheet: View {
                 }
 
                 if plan.days.isEmpty {
-                    Section { Text("You've finished every lesson. Review the ones above, or make a new lesson with Asteria Intelligence.") }
+                    Section { Text("You've finished every lesson. Review the ones above, or make a new lesson with Smartz.") }
                 }
             }
             .navigationTitle("Your week")

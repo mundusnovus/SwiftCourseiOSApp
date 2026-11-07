@@ -1,4 +1,4 @@
-// Settings on both platforms: appearance, reading, iCloud, Asteria Intelligence, progress, and the honest about block.
+// Settings on both platforms: appearance, reading, iCloud, Smartz, progress, and the honest about block.
 import SwiftUI
 import AppIntents
 import ZeroToHeroKit
@@ -88,8 +88,10 @@ struct SettingsView: View {
             Text("iCloud")
         }
 
-        AsteriaAccountSection { ZTHChats.asteria.forgetOnThisDevice() }
-        AsteriaIntelligenceSettingsSection()
+        AsteriaAccountSection { ZTHChats.smartz.forgetOnThisDevice() }
+        SmartzSettingsSection()
+        SmartzVoiceSection()
+        SmartzLearningSection()
 
         Section {
             Toggle("Share lessons with Siri and Spotlight", isOn: $shareWithSiri)
@@ -143,7 +145,7 @@ struct SettingsView: View {
         } header: {
             Text("About")
         } footer: {
-            Text("© 2026 Asteria Technology. Swift and Asteria Intelligence are Apple's.")
+            Text("© 2026 Asteria Technology. Swift and Smartz are Apple's.")
         }
     }
 
