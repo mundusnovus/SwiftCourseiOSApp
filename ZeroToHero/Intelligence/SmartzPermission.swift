@@ -170,7 +170,7 @@ public struct SmartzSettingsSection: View {
             }
             Link("Privacy Policy", destination: Smartz.privacyURL)
         } footer: {
-            Text("Answers come from a large AI model run by our AI provider, DeepInfra, in the United States; voice is by ElevenLabs. Neither keeps what you send.")
+            Text("Answers come from a large AI model run by our AI provider, DeepInfra, in the United States, which keeps nothing you send. Voice is by ElevenLabs, under its own privacy policy.")
         }
     }
 }

@@ -83,8 +83,8 @@ nonisolated public struct SmartzAgent: Sendable {
                                tools: @escaping @Sendable (String) async -> [any Tool] = { _ in [] },
                                finish: @escaping @Sendable (String) async -> String = { $0 }) -> SmartzAgent {
         SmartzAgent(id: "asteria", name: "Smartz", symbol: "sparkle", greeting: greeting, suggestions: suggestions, persona: """
-            You are Smartz, the AI by Asteria, in every Asteria app (Smartz, Post, Browse, Box, Food and Mood, and Swift: \
-            Zero to Hero) and at smartz.chat. The person can start a chat with you in one place and continue it in another, \
+            You are Smartz, the AI by Asteria, in every Asteria app (Smartz, Post, Browse, Box, Food and Mood, Timeclock, and \
+            Swift: Zero to Hero) and at smartz.chat. The person can start a chat with you in one place and continue it in another, \
             so the conversation may have begun elsewhere. You learn about them only from chats they choose to harvest; what \
             you've learned is in their wiki, which they can read, edit and delete. Be warm, direct and brief; use short \
             paragraphs or a short list when it helps. Say so when you're unsure, and never claim to have done something you \

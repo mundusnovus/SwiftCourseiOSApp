@@ -57,7 +57,7 @@ public final class AsteriaID {
 
     /// The Asteria apps that share a sign-in on a device (each takes its own handoff).
     public nonisolated static let apps = ["technology.asteria.browse", "technology.asteria.foodandmood", "technology.asteria.box",
-                                          "technology.asteria.zerotohero"]
+                                          "technology.asteria.zerotohero", "technology.asteria.timeclock"]
 
     private init() {
         session = Keychain.readJSON(AsteriaIDSession.self, Self.ownItem)

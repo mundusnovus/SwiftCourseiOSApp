@@ -555,7 +555,7 @@ public struct SmartzSubscriptionView: View {
         Form {
             Section {
                 SmartzTokensBadge()
-                Text("Smartz tokens pay for Smartz in every Asteria app: Smartz, Post, Browse, Box, Food and Mood, and Swift: Zero to Hero. Your tokens refresh at midnight UTC.")
+                Text("Smartz tokens pay for Smartz in every Asteria app: Smartz, Post, Browse, Box, Food and Mood, Timeclock, and Swift: Zero to Hero. Your tokens refresh at midnight UTC.")
                     .font(.callout)
             }
             Section {
@@ -633,63 +633,90 @@ public struct AsteriaSignInView: View {
     @State private var check: AsteriaID.UsernameCheck?
     @State private var working = false
     @State private var problem: String?
+    /// Signed in (or made): the form gives way to a confirmation, and Done closes the sheet. Closing it straight away
+    /// collided with the system's "Save Password?" prompt, which left a sheet that wouldn't close.
+    @State private var welcomed: String?
 
     public init(mode: Mode = .signIn) { _mode = State(initialValue: mode) }
 
     public var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    if mode == .signUp { TextField("Name", text: $name).textContentType(.name) }
-                    TextField("Username", text: $username)
-                        .textContentType(mode == .signUp ? .username : .username)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        #endif
-                        .autocorrectionDisabled()
-                    if mode == .signUp {
-                        TextField("Email", text: $email).textContentType(.emailAddress)
-                            #if os(iOS)
-                            .keyboardType(.emailAddress).textInputAutocapitalization(.never)
-                            #endif
-                            .autocorrectionDisabled()
-                    }
-                    SecureField("Password", text: $password).textContentType(mode == .signUp ? .newPassword : .password)
-                } footer: {
-                    if mode == .signUp, let check, !username.isEmpty {
-                        Text(check.available ? "@\(check.username) is free." : (check.reason ?? "That username is taken."))
-                            .foregroundStyle(check.available ? Color.secondary : Color.red)
-                    } else if mode == .signIn {
-                        Text("Your username, like maya. The same one you use in Smartz and Post.")
-                    }
+            if let welcomed {
+                VStack(spacing: 14) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.tint)
+                    Text(mode == .signUp ? "Welcome, @\(welcomed)" : "Signed in as @\(welcomed)")
+                        .font(.title3.bold())
+                    Text("Your Asteria Account works in every Asteria app, with the same Smartz tokens and chats with Smartz.")
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                    Button { dismiss() } label: { Text("Done").bold().frame(maxWidth: 280) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .padding(.top, 6)
                 }
-                if let problem { Section { Text(problem).foregroundStyle(.red) } }
-                Section {
-                    Button(action: submit) {
-                        HStack {
-                            Text(mode == .signIn ? "Sign In" : "Make Account").bold()
-                            if working { Spacer(); ProgressView() }
-                        }
-                    }
-                    .disabled(!ready || working)
-                    Button(mode == .signIn ? "New here? Make an Asteria Account" : "Already have one? Sign in") {
-                        mode = mode == .signIn ? .signUp : .signIn
-                        problem = nil
-                    }
-                }
-            }
-            .formStyle(.grouped)
-            .navigationTitle(mode == .signIn ? "Asteria Account" : "Make an Asteria Account")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-            .task(id: username) {
-                guard mode == .signUp, !username.isEmpty else { check = nil; return }
-                try? await Task.sleep(for: .milliseconds(400))
-                check = await AsteriaID.check(username: username)
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle(mode == .signIn ? "Asteria Account" : "Make an Asteria Account")
+            } else {
+                form
             }
         }
         #if os(macOS)
         .frame(minWidth: 400, minHeight: 420)
         #endif
+    }
+
+    private var form: some View {
+        Form {
+            Section {
+                if mode == .signUp { TextField("Name", text: $name).textContentType(.name) }
+                TextField("Username", text: $username)
+                    .textContentType(mode == .signUp ? .username : .username)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    #endif
+                    .autocorrectionDisabled()
+                if mode == .signUp {
+                    TextField("Email", text: $email).textContentType(.emailAddress)
+                        #if os(iOS)
+                        .keyboardType(.emailAddress).textInputAutocapitalization(.never)
+                        #endif
+                        .autocorrectionDisabled()
+                }
+                SecureField("Password", text: $password).textContentType(mode == .signUp ? .newPassword : .password)
+            } footer: {
+                if mode == .signUp, let check, !username.isEmpty {
+                    Text(check.available ? "@\(check.username) is free." : (check.reason ?? "That username is taken."))
+                        .foregroundStyle(check.available ? Color.secondary : Color.red)
+                } else if mode == .signIn {
+                    Text("Your username, like maya. The same one you use in Smartz and Post.")
+                }
+            }
+            if let problem { Section { Text(problem).foregroundStyle(.red) } }
+            Section {
+                Button(action: submit) {
+                    HStack {
+                        Text(mode == .signIn ? "Sign In" : "Make Account").bold()
+                        if working { Spacer(); ProgressView() }
+                    }
+                }
+                .disabled(!ready || working)
+                Button(mode == .signIn ? "New here? Make an Asteria Account" : "Already have one? Sign in") {
+                    mode = mode == .signIn ? .signUp : .signIn
+                    problem = nil
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(mode == .signIn ? "Asteria Account" : "Make an Asteria Account")
+        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        .task(id: username) {
+            guard mode == .signUp, !username.isEmpty else { check = nil; return }
+            try? await Task.sleep(for: .milliseconds(400))
+            check = await AsteriaID.check(username: username)
+        }
     }
 
     private var ready: Bool {
@@ -707,7 +734,7 @@ public struct AsteriaSignInView: View {
                 } else {
                     try await AsteriaID.shared.signUp(name: name, username: username, email: email, password: password)
                 }
-                dismiss()
+                welcomed = AsteriaID.shared.username ?? AsteriaID.username(fromHandle: username)
             } catch {
                 problem = error.localizedDescription
             }
@@ -730,7 +757,7 @@ public struct AsteriaDeleteAccountView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("This deletes your Asteria Account everywhere: your Asteria Post account and posts, your bots' usernames, your Smartz tokens, and your chats with Smartz in every app. It can't be undone.")
+                    Text("This deletes your Asteria Account everywhere: your Asteria Post account and posts, your bots' usernames, your Smartz tokens, your chats with Smartz in every app, and what apps sync through it, like Timeclock's hours. It can't be undone.")
                     SecureField("Password", text: $password).textContentType(.password)
                 }
                 if let problem { Section { Text(problem).foregroundStyle(.red) } }
