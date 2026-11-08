@@ -161,7 +161,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/ZeroToHero-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/ZeroToHero-macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = KZFR2T5L2A;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -186,7 +186,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 27.2.5;
+				MARKETING_VERSION = 27.2.6;
 				PRODUCT_BUNDLE_IDENTIFIER = technology.asteria.zerotohero;
 				PRODUCT_NAME = "Swift Zero to Hero";
 				SDKROOT = auto;
@@ -207,7 +207,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Config/ZeroToHero-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/ZeroToHero-macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = KZFR2T5L2A;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -232,7 +232,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 27.2.5;
+				MARKETING_VERSION = 27.2.6;
 				PRODUCT_BUNDLE_IDENTIFIER = technology.asteria.zerotohero;
 				PRODUCT_NAME = "Swift Zero to Hero";
 				SDKROOT = auto;

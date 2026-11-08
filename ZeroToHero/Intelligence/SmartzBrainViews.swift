@@ -122,11 +122,38 @@ public struct SmartzWikiView: View {
 
     public var body: some View {
         let shown = query.isEmpty ? pages : pages.filter { $0.title.localizedStandardContains(query) }
-        List {
+        container { sections(shown) }
+        .searchable(text: $query, prompt: "Search your wiki")
+        .overlay {
+            if shown.isEmpty && !loading {
+                if query.isEmpty {
+                    ContentUnavailableView("Your wiki is empty", systemImage: "book.closed",
+                                           description: Text("Harvest a chat with Smartz in any Asteria app, and Smartz writes pages about what you discussed."))
+                } else {
+                    ContentUnavailableView.search(text: query)
+                }
+            }
+        }
+        .navigationTitle("Wiki")
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    /// Grouped sections on the Mac, like its settings; a list on iPhone and iPad.
+    @ViewBuilder private func container<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        #if os(macOS)
+        Form { content() }.formStyle(.grouped)
+        #else
+        List { content() }
+        #endif
+    }
+
+    @ViewBuilder private func sections(_ shown: [SmartzWikiPage]) -> some View {
             Section {
                 Toggle(isOn: Binding(get: { settings.wikiPublic }, set: { on in publish(on) })) {
                     Label("Publish at smartz.chat", systemImage: "globe")
                 }
+                .toggleStyle(.switch)
                 if settings.wikiPublic, let url = settings.publicURL {
                     Link(destination: url) {
                         Label(url.absoluteString.replacingOccurrences(of: "https://", with: ""), systemImage: "link")
@@ -151,21 +178,6 @@ public struct SmartzWikiView: View {
                     }
                 }
             }
-        }
-        .searchable(text: $query, prompt: "Search your wiki")
-        .overlay {
-            if shown.isEmpty && !loading {
-                if query.isEmpty {
-                    ContentUnavailableView("Your wiki is empty", systemImage: "book.closed",
-                                           description: Text("Harvest a chat with Smartz in any Asteria app, and Smartz writes pages about what you discussed."))
-                } else {
-                    ContentUnavailableView.search(text: query)
-                }
-            }
-        }
-        .navigationTitle("Wiki")
-        .task { await load() }
-        .refreshable { await load() }
     }
 
     private func load() async {

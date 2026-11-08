@@ -139,6 +139,45 @@ public struct SmartzChatView<Accessory: View>: View {
         .task { await chats.refresh() }
     }
 
+    #if os(macOS)
+    /// On the Mac: centred, with the suggestions as cards in a grid, in a column that reads well in a wide window.
+    private var welcome: some View {
+        VStack(spacing: 18) {
+            Image(systemName: chats.agent.symbol)
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 64, height: 64)
+                .glassEffect(in: .circle)
+            Text(chats.agent.greeting)
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 520)
+            if !chats.agent.suggestions.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
+                    ForEach(chats.agent.suggestions, id: \.self) { suggestion in
+                        Button { chats.send(suggestion) } label: {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Image(systemName: "arrow.up.right").font(.callout.weight(.semibold)).foregroundStyle(.tint)
+                                Text(suggestion).font(.callout).multilineTextAlignment(.leading).foregroundStyle(.primary)
+                                Spacer(minLength: 0)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+                            .padding(14)
+                            .background(.quaternary.opacity(0.55), in: .rect(cornerRadius: 14))
+                            .contentShape(.rect(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .frame(maxWidth: 680)
+            }
+            SmartzTokensBadge()
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 56)
+        .frame(maxWidth: .infinity)
+    }
+    #else
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 14) {
             Image(systemName: chats.agent.symbol).font(.system(size: 34, weight: .semibold)).foregroundStyle(.tint)
@@ -157,6 +196,7 @@ public struct SmartzChatView<Accessory: View>: View {
         }
         .padding()
     }
+    #endif
 
     private var more: some View {
         Menu {

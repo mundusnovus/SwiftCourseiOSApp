@@ -65,6 +65,10 @@ nonisolated public enum Smartz {
             $0.developmentKey = value(after: "-intelligence-dev-key")
         }
         #endif
+        #if os(iOS)
+        // The button on top of the iPhone keyboard that hides it, for every field in the app (SmartzKeyboard.swift).
+        Task { @MainActor in SmartzKeyboard.install() }
+        #endif
     }
 
     /// The signed-in account changed (signed in, out, or deleted): start a new session with it, and refresh tokens
