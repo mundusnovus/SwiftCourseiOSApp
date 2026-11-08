@@ -1,5 +1,38 @@
 # App Store listing — Swift: Zero to Hero 2.0
 
+## 27.2.7: ready to submit (8 November 2026)
+
+The version for the App Store. Everything below this section is from earlier versions.
+
+### What's New in 27.2.7
+
+- The Smartz Subscription: more Smartz tokens every day, in every Asteria app and at smartz.chat. It's offered when you sign in, and when you run out for the day.
+- Attach photos and files to your messages to Smartz: PDFs, text, and Word, Excel and PowerPoint documents.
+- Connectors: let Smartz use Notion, Linear, GitHub and dozens more. Set one up once and it works in every Asteria app.
+- A button to hide the keyboard while you type, on iPhone.
+
+### Add to the end of the Description
+
+The app is free. Smartz, the AI in every Asteria app, runs on Smartz tokens: every Asteria Account gets a free daily allowance, and The Smartz Subscription gives you more every day, in every Asteria app and at smartz.chat. Plans are monthly, auto-renewing subscriptions: Easy Going (8 Smartz tokens a day), Casual (16), Serious (32), Dedicated (64), Legit (128), Pro (256), Literally Insane (512) and How? (1,024). Payment is charged to your Apple Account when you confirm the purchase. A plan renews automatically unless you turn off renewal at least 24 hours before the end of the month, and you can manage or cancel it in your App Store account settings.
+
+Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Privacy Policy: https://asteria.technology/privacy/
+
+### In-App Purchases
+
+The Smartz Subscription's eight plans, as Swift: Zero to Hero's own products (technology.asteria.zerotohero.smartz.<plan>). Every product, its text and the App Store Connect steps are in AsteriaWire/Wire/docs/SMARTZ-SUBSCRIPTION.md. Add the plans to this version before submitting it.
+
+### App Privacy
+
+Add to the App Privacy answers: Purchases › Purchase History: collected, linked to the user (their Asteria Account), used for App Functionality, not for tracking. (Photos and files attached to Smartz are sent for the answer and not kept, as with chats; connectors talk to their services from the device.)
+
+### Review notes
+
+The Smartz Subscription is a group of auto-renewable subscriptions (one per plan) that give the person's Asteria Account more Smartz tokens a day. Where to find it: Settings › Asteria Account › The Smartz Subscription; right after signing in; and when the day's Smartz tokens run out. Purchases are checked by Asteria's server with Apple's signed transactions, and the plan applies to the account in every Asteria app. Restore Purchases and Manage Subscription are on the same screen.
+
+Demo Asteria Account: username [OWNER: demo username], password [OWNER: password]. (Without signing in, the plans screen asks you to sign in first.)
+
+
 ## Name and subtitle
 
 - **Name:** Swift: Zero to Hero

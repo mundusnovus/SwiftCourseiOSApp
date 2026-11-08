@@ -110,9 +110,13 @@ public struct SmartzKnowsView: View {
     }
 }
 
-/// Your Smartz wiki: pages Smartz writes, as time goes on, about what you've discussed. Private unless you publish it.
+/// Your Smartz wiki: pages Smartz writes, as time goes on, about what you've discussed, and the harvests (from every
+/// Asteria app) that wrote them. Private unless you publish it. It refreshes when you come back to the app, so a harvest
+/// in another app shows up here.
 public struct SmartzWikiView: View {
+    @Environment(\.scenePhase) private var phase
     @State private var pages: [SmartzWikiPage] = []
+    @State private var harvests: [SmartzHarvestRecord] = []
     @State private var settings = SmartzSettings()
     @State private var query = ""
     @State private var loading = true
@@ -137,6 +141,8 @@ public struct SmartzWikiView: View {
         .navigationTitle("Wiki")
         .task { await load() }
         .refreshable { await load() }
+        .onChange(of: phase) { _, now in if now == .active { Task { await load() } } }
+        .onReceive(NotificationCenter.default.publisher(for: SmartzBrain.didLearn)) { _ in Task { await load() } }
     }
 
     /// Grouped sections on the Mac, like its settings; a list on iPhone and iPad.
@@ -168,7 +174,19 @@ public struct SmartzWikiView: View {
             if let problem {
                 Section { Text(problem).foregroundStyle(.secondary) }
             }
-            Section {
+            if !harvests.isEmpty && query.isEmpty {
+                Section {
+                    ForEach(harvests.prefix(3)) { harvest in SmartzHarvestRow(harvest: harvest) }
+                    if harvests.count > 3 {
+                        NavigationLink("All Harvests (\(harvests.count))") { SmartzHarvestsView(harvests: harvests) }
+                    }
+                } header: {
+                    Text("Recent Harvests")
+                } footer: {
+                    Text("Harvest a chat with Smartz in any Asteria app, and what Smartz learned shows up here.")
+                }
+            }
+            Section(pages.isEmpty ? "" : "Pages") {
                 ForEach(shown) { page in
                     NavigationLink { SmartzWikiPageView(page: page, onDelete: { pages.removeAll { $0.slug == page.slug } }) } label: {
                         VStack(alignment: .leading, spacing: 2) {
@@ -186,8 +204,10 @@ public struct SmartzWikiView: View {
         do {
             async let wiki = SmartzBrain.wiki()
             async let current = SmartzBrain.settings()
+            async let recent = SmartzBrain.harvests()
             pages = try await wiki.pages
             settings = try await current
+            harvests = (try? await recent) ?? harvests
             problem = nil
         } catch {
             problem = Smartz.message(for: error)
@@ -203,6 +223,41 @@ public struct SmartzWikiView: View {
                 problem = Smartz.message(for: error)
             }
         }
+    }
+}
+
+/// One harvest: where it was, what Smartz took from it, and which pages it wrote.
+public struct SmartzHarvestRow: View {
+    let harvest: SmartzHarvestRecord
+
+    public init(harvest: SmartzHarvestRecord) { self.harvest = harvest }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "leaf").foregroundStyle(.tint).accessibilityHidden(true)
+                Text(harvest.title.isEmpty ? "A chat with Smartz" : harvest.title).font(.headline).lineLimit(1)
+            }
+            if !harvest.summary.isEmpty { Text(harvest.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(3) }
+            Text(details).font(.caption).foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var details: String {
+        var parts = [harvest.app.isEmpty ? nil : "In \(harvest.app)", harvest.createdAt.formatted(.relative(presentation: .named))].compactMap { $0 }
+        if harvest.memories > 0 { parts.append(harvest.memories == 1 ? "1 memory" : "\(harvest.memories) memories") }
+        if !harvest.pages.isEmpty { parts.append("Wiki: " + harvest.pages.joined(separator: ", ")) }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// Every harvest, from every Asteria app.
+struct SmartzHarvestsView: View {
+    let harvests: [SmartzHarvestRecord]
+    var body: some View {
+        List(harvests) { SmartzHarvestRow(harvest: $0) }
+            .navigationTitle("Harvests")
     }
 }
 
@@ -352,15 +407,21 @@ public struct SmartzLearningSection: View {
     public var body: some View {
         Section {
             NavigationLink { SmartzKnowsView() } label: { Label("What Smartz Knows", systemImage: "brain.head.profile") }
+            NavigationLink { SmartzConnectorsView() } label: {
+                LabeledContent {
+                    let count = SmartzConnectors.shared.list.count
+                    Text(count == 0 ? "" : "\(count)")
+                } label: { Label("Connectors", systemImage: "puzzlepiece.extension") }
+            }
             if let settings {
                 Toggle(isOn: Binding(get: { settings.unified }, set: { on in share(on) })) {
                     Label("Unified Intelligence", systemImage: "point.3.connected.trianglepath.dotted")
                 }
             }
         } header: {
-            Text("Learning")
+            Text("Learning and Connectors")
         } footer: {
-            Text("Smartz learns about you only from chats you harvest, and keeps what it learns private. With Unified Intelligence on, your harvests also teach Smartz general skills, like a good way to plan a trip, that make it better for everyone. Skills never carry anything personal, and nothing is shared unless you turn this on.")
+            Text("Connectors let Smartz use your other services (Notion, Linear, GitHub and more) in your chats with it. Smartz learns about you only from chats you harvest, and keeps what it learns private. With Unified Intelligence on, your harvests also teach Smartz general skills, like a good way to plan a trip, that make it better for everyone. Skills never carry anything personal, and nothing is shared unless you turn this on.")
         }
         .disabled(!Smartz.isOn)
         .task { if Smartz.isOn { settings = try? await SmartzBrain.settings() } }

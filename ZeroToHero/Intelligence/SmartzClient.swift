@@ -45,6 +45,13 @@ actor IntelligenceClient {
 
     private func forget() { session = nil }
 
+    /// This app has an Asteria Account to start a session with (its own sign-in, or the shared one).
+    func hasAccount() async -> Bool {
+        let configured = Smartz.settings.withLock { $0.credential }
+        if let configured { return await configured() != nil }
+        return await AsteriaID.shared.accessToken() != nil
+    }
+
     /// Starts over with whoever is signed in now.
     func reset() { session = nil }
 
@@ -323,6 +330,7 @@ actor IntelligenceClient {
         switch status {
         case 429:
             let daily = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "X-Asteria-Limit") == "daily"
+            if daily { SmartzSubscription.noteLimit() }
             return LanguageModelErrorBridge.rateLimited(message.isEmpty ? "Smartz is busy. Try again in a moment." : message,
                                                         resets: daily ? IntelligenceClient.nextMidnightUTC() : nil)
         case 413: return LanguageModelErrorBridge.tooLong(message)

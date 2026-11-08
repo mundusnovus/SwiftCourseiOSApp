@@ -47,6 +47,14 @@ nonisolated public struct SmartzChatMessage: Codable, Identifiable, Hashable, Se
     var seq: Int64?
     /// Not on the server yet.
     var pending = false
+    /// Files attached to this message: their words, kept on this device only (the server has just their names).
+    public var files: [SmartzChatFile]?
+
+    /// What the model reads for this message: its text, and the words of any files still on this device.
+    var prompt: String {
+        guard let files, !files.isEmpty else { return text }
+        return ([text] + files.map(\.prompt)).joined(separator: "\n\n")
+    }
 }
 
 /// Who answers in a chat: Smartz everywhere, or an app's own agent. Each app adds what it knows (the page, the song,
@@ -241,17 +249,20 @@ public final class SmartzChats {
     }
 
     /// Sends a message in the open chat (a new one if none is open) and streams the answer. `spoken`: said out loud in
-    /// audio mode, so the answer is written to be heard.
-    public func send(_ text: String, images: [CGImage] = [], spoken: Bool = false) {
+    /// audio mode, so the answer is written to be heard. `files`: documents' words (SmartzAttachments.swift).
+    public func send(_ text: String, images: [CGImage] = [], files: [SmartzChatFile] = [], spoken: Bool = false) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !images.isEmpty, answering == nil else { return }
+        guard !text.isEmpty || !images.isEmpty || !files.isEmpty, answering == nil else { return }
         let id = current ?? newThread()
-        var messageText = text
-        if !images.isEmpty { messageText += (text.isEmpty ? "" : "\n") + (images.count == 1 ? "[a photo]" : "[\(images.count) photos]") }
-        let message = SmartzChatMessage(id: UUID().uuidString.lowercased(), role: .user, text: messageText, app: appName, createdAt: .now, pending: true)
+        var lines = text.isEmpty ? [] : [text]
+        lines += files.map { "📎 " + $0.name }
+        if !images.isEmpty { lines.append(images.count == 1 ? "[a photo]" : "[\(images.count) photos]") }
+        let messageText = lines.joined(separator: "\n")
+        var message = SmartzChatMessage(id: UUID().uuidString.lowercased(), role: .user, text: messageText, app: appName, createdAt: .now, pending: true)
+        if !files.isEmpty { message.files = files }
         messages[id, default: []].append(message)
         if let index = threads.firstIndex(where: { $0.id == id }) {
-            if threads[index].title.isEmpty { threads[index].title = Self.title(from: text.isEmpty ? "Photo" : text) }
+            if threads[index].title.isEmpty { threads[index].title = Self.title(from: text.isEmpty ? (files.first?.name ?? "Photo") : text) }
             threads[index].preview = String(messageText.prefix(140))
             threads[index].updatedAt = .now
         }
@@ -260,7 +271,7 @@ public final class SmartzChats {
         error = nil
         answerTask = Task { [weak self] in
             await self?.upload(id)
-            await self?.answer(in: id, to: text, images: images, spoken: spoken)
+            await self?.answer(in: id, to: text, files: files, images: images, spoken: spoken)
         }
     }
 
@@ -285,7 +296,7 @@ public final class SmartzChats {
         }
     }
 
-    private func answer(in id: String, to text: String, images: [CGImage], spoken: Bool) async {
+    private func answer(in id: String, to text: String, files: [SmartzChatFile] = [], images: [CGImage], spoken: Bool) async {
         answering = id
         draft = ""
         let replyID = UUID().uuidString.lowercased()
@@ -296,7 +307,9 @@ public final class SmartzChats {
         defer { answering = nil; draft = "" }
         let history = Array((messages[id] ?? []).dropLast())
         do {
-            let tools = await agent.tools(text)
+            var tools = await agent.tools(text)
+            // Your connectors (MCP servers), in your chats with Smartz: the few tools closest to what was asked.
+            if agent.learns { tools += await SmartzConnectors.shared.tools(for: text, limit: max(0, 8 - tools.count)) }
             let context = await agent.context(text)
             let today = Date.now.formatted(date: .complete, time: .shortened)
             var instructions = (agent.persona.isEmpty ? "" : agent.persona + "\n\n")
@@ -316,9 +329,10 @@ public final class SmartzChats {
             var earlier: [Transcript.Entry] = []
             var cut: Int?
             for (index, message) in history.enumerated().reversed() {
-                budget -= message.text.count
+                let said = message.role == .user ? message.prompt : message.text
+                budget -= said.count
                 if budget < 0 { cut = index; break }
-                let segment = Transcript.Segment.text(.init(content: message.text))
+                let segment = Transcript.Segment.text(.init(content: said))
                 earlier.insert(message.role == .user ? .prompt(Transcript.Prompt(segments: [segment]))
                                                      : .response(Transcript.Response(assetIDs: [], segments: [segment])), at: 0)
             }
@@ -330,7 +344,10 @@ public final class SmartzChats {
                 + earlier
             let model = SmartzModel(context: agent.learns ? "chat" : nil, thinkHarder: thinkHarder)
             let session = LanguageModelSession(model: model, tools: tools, transcript: Transcript(entries: entries))
-            let ask = text.isEmpty ? "What's in this photo?" : text
+            var ask = text.isEmpty && files.isEmpty ? (images.count == 1 ? "What's in this photo?" : "What's in these photos?") : text
+            if !files.isEmpty {
+                ask = ([text.isEmpty ? (files.count == 1 ? "Here's a file." : "Here are some files.") : text] + files.map(\.prompt)).joined(separator: "\n\n")
+            }
             let stream = images.isEmpty
                 ? session.streamResponse(to: ask)
                 : session.streamResponse { ask; for image in images.prefix(4) { Attachment(image) } }
@@ -390,6 +407,11 @@ public final class SmartzChats {
         text.range(of: "(^|\\n)\\[(a photo|\\d+ photos)\\]$", options: .regularExpression) != nil
     }
 
+    /// Files are attached (their words may be on this device only).
+    nonisolated static func hasFiles(_ text: String) -> Bool {
+        text.range(of: "(^|\\n)📎 ", options: .regularExpression) != nil
+    }
+
     /// The open chat's last answer can be written again (its question had no photos, which aren't kept).
     public var canRegenerate: Bool {
         guard answering == nil, let list = current.flatMap({ messages[$0] }), let last = list.last, last.role == .assistant,
@@ -404,13 +426,13 @@ public final class SmartzChats {
         save()
         error = nil
         Task { await removeOnServer(id, [old]) }
-        answerTask = Task { [weak self] in await self?.answer(in: id, to: question.text, images: [], spoken: false) }
+        answerTask = Task { [weak self] in await self?.answer(in: id, to: question.text, files: question.files ?? [], images: [], spoken: false) }
     }
 
     /// Takes back your last message and its answer, to change it: gives its text for the composer.
     public func editLast() -> String? {
         guard answering == nil, let id = current, var list = messages[id],
-              let index = list.lastIndex(where: { $0.role == .user }), !Self.hasPhotos(list[index].text) else { return nil }
+              let index = list.lastIndex(where: { $0.role == .user }), !Self.hasPhotos(list[index].text), !Self.hasFiles(list[index].text) else { return nil }
         let removed = Array(list[index...])
         list.removeSubrange(index...)
         messages[id] = list

@@ -186,7 +186,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 27.2.6;
+				MARKETING_VERSION = 27.2.7;
 				PRODUCT_BUNDLE_IDENTIFIER = technology.asteria.zerotohero;
 				PRODUCT_NAME = "Swift Zero to Hero";
 				SDKROOT = auto;
@@ -232,7 +232,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 27.2.6;
+				MARKETING_VERSION = 27.2.7;
 				PRODUCT_BUNDLE_IDENTIFIER = technology.asteria.zerotohero;
 				PRODUCT_NAME = "Swift Zero to Hero";
 				SDKROOT = auto;

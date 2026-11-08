@@ -1,6 +1,7 @@
 // The screens every Asteria app shares: chatting with Smartz (or an app's own agent), the Asteria Account (sign in,
 // make one, sign out, delete it), today's Smartz tokens, and The Smartz Subscription. Voice and audio mode are in
 // SmartzVoiceViews.swift; what Smartz knows and the wiki in SmartzBrainViews.swift.
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 #if canImport(UIKit)
@@ -11,8 +12,8 @@ import AppKit
 
 // MARK: Chat
 
-/// A chat with an agent: the open conversation, a list of earlier chats, and a composer with the microphone and audio
-/// mode. `accessory` goes beside the text field (a photo button, say).
+/// A chat with an agent: the open conversation, a list of earlier chats, and a composer with photos and files, the
+/// microphone and audio mode. `accessory` goes beside the text field.
 public struct SmartzChatView<Accessory: View>: View {
     @Bindable var chats: SmartzChats
     let accessory: Accessory
@@ -26,6 +27,12 @@ public struct SmartzChatView<Accessory: View>: View {
     @State private var harvestProblem: String?
     @State private var talking = false
     @State private var transcribing = false
+    @State private var attachments: [SmartzAttachment] = []
+    @State private var photoItems: [PhotosPickerItem] = []
+    @State private var choosingPhotos = false
+    @State private var choosingFiles = false
+    @State private var attachProblem: String?
+    @State private var dropping = false
     @FocusState private var focused: Bool
 
     private var voice: SmartzVoice { .shared }
@@ -52,11 +59,18 @@ public struct SmartzChatView<Accessory: View>: View {
                                 .id(message.id)
                         }
                         if let answering = chats.answering, answering == chats.current {
-                            Bubble(text: chats.draft.isEmpty ? "…" : SmartzSpeech.visible(chats.draft), mine: false,
+                            Bubble(text: chats.draft.isEmpty ? (SmartzConnectors.shared.activity ?? "…") : SmartzSpeech.visible(chats.draft), mine: false,
                                    symbol: chats.agent.symbol, working: true).id("draft")
                         }
                         if let error = chats.error {
                             Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+                            if usage.known && usage.tokensLeft == 0 {
+                                // Out of today's tokens: the plans, whenever they were last offered.
+                                Button { SmartzSubscription.shared.showPlans() } label: {
+                                    Label("Get More Smartz Tokens", systemImage: "circle.hexagongrid.fill")
+                                }
+                                .font(.footnote.bold()).buttonStyle(.borderless).padding(.horizontal)
+                            }
                         }
                         if let problem = voice.problem, !talking {
                             Button { voice.problem = nil } label: {
@@ -87,7 +101,27 @@ public struct SmartzChatView<Accessory: View>: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal).padding(.bottom, 6)
             }
+            if !attachments.isEmpty { attachmentStrip }
+            if let attachProblem {
+                Button { self.attachProblem = nil } label: {
+                    Label(attachProblem, systemImage: "paperclip.badge.ellipsis").font(.caption).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain).padding(.horizontal).padding(.bottom, 4)
+            }
             composer
+        }
+        .overlay {
+            if dropping {
+                RoundedRectangle(cornerRadius: 18).strokeBorder(.tint, style: StrokeStyle(lineWidth: 2, dash: [8]))
+                    .overlay { Label("Attach to your message", systemImage: "paperclip").font(.headline).foregroundStyle(.tint) }
+                    .padding(8).allowsHitTesting(false)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in attach(urls); return !urls.isEmpty } isTargeted: { dropping = $0 }
+        .photosPicker(isPresented: $choosingPhotos, selection: $photoItems, maxSelectionCount: 4, matching: .images)
+        .onChange(of: photoItems) { _, items in loadPhotos(items) }
+        .fileImporter(isPresented: $choosingFiles, allowedContentTypes: SmartzFiles.types, allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { attach(urls) }
         }
         .toolbar {
             ToolbarItem(placement: .automatic) {
@@ -234,6 +268,7 @@ public struct SmartzChatView<Accessory: View>: View {
                 dictation
             } else {
                 accessory
+                attachMenu
                 TextField("Message \(chats.agent.name)", text: $text, axis: .vertical)
                     .lineLimit(1...6)
                     .focused($focused)
@@ -244,7 +279,7 @@ public struct SmartzChatView<Accessory: View>: View {
                 if chats.answering != nil {
                     Button { chats.stop() } label: { Image(systemName: "stop.circle.fill").font(.title) }
                         .accessibilityLabel("Stop")
-                } else if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && SmartzVoice.canListen && Smartz.canOffer {
+                } else if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachments.isEmpty && SmartzVoice.canListen && Smartz.canOffer {
                     Button { dictate() } label: { Image(systemName: "mic").font(.title2) }
                         .accessibilityLabel("Dictate")
                         .padding(.bottom, 6)
@@ -252,7 +287,7 @@ public struct SmartzChatView<Accessory: View>: View {
                         .accessibilityLabel("Talk with \(chats.agent.name)")
                 } else {
                     Button(action: send) { Image(systemName: "arrow.up.circle.fill").font(.title) }
-                        .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachments.isEmpty)
                         .accessibilityLabel("Send")
                         .keyboardShortcut(.return, modifiers: .command)
                 }
@@ -289,8 +324,86 @@ public struct SmartzChatView<Accessory: View>: View {
 
     private func send() {
         let message = text
+        let sending = attachments
+        guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !sending.isEmpty, chats.answering == nil else { return }
         text = ""
-        chats.send(message)
+        attachments = []
+        attachProblem = nil
+        chats.send(message, images: sending.compactMap(\.image), files: sending.compactMap(\.file))
+    }
+
+    // MARK: Photos and files
+
+    private var attachMenu: some View {
+        Menu {
+            Button("Photos", systemImage: "photo.on.rectangle") { choosingPhotos = true }
+            Button("Files", systemImage: "doc") { choosingFiles = true }
+        } label: {
+            Image(systemName: "plus.circle").font(.title2)
+        }
+        .menuIndicator(.hidden)
+        .accessibilityLabel("Attach Photos or Files")
+        .padding(.bottom, 6)
+        .disabled(attachments.count >= SmartzFiles.maxAttachments)
+    }
+
+    private var attachmentStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(attachments) { attachment in
+                    HStack(spacing: 6) {
+                        if let image = attachment.image {
+                            Image(decorative: image, scale: 1).resizable().scaledToFill()
+                                .frame(width: 34, height: 34).clipShape(.rect(cornerRadius: 7))
+                        } else {
+                            Image(systemName: "doc.text").font(.title3).foregroundStyle(.tint).frame(width: 34, height: 34)
+                        }
+                        Text(attachment.isPhoto ? "Photo" : attachment.name).font(.caption).lineLimit(1).frame(maxWidth: 140, alignment: .leading)
+                        Button { attachments.removeAll { $0.id == attachment.id } } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(attachment.isPhoto ? "photo" : attachment.name)")
+                    }
+                    .padding(.leading, 4).padding(.trailing, 8).padding(.vertical, 4)
+                    .background(.quaternary.opacity(0.6), in: .capsule)
+                }
+            }
+            .padding(.horizontal, 14)
+        }
+        .padding(.top, 4)
+    }
+
+    private func attach(_ urls: [URL]) {
+        var problems: [String] = []
+        for url in urls {
+            guard attachments.count < SmartzFiles.maxAttachments else { problems.append("You can attach up to \(SmartzFiles.maxAttachments) at a time."); break }
+            do {
+                let attachment = try SmartzFiles.load(url)
+                if attachment.isPhoto && attachments.filter(\.isPhoto).count >= 4 { problems.append("Up to 4 photos at a time."); continue }
+                attachments.append(attachment)
+            } catch {
+                problems.append(error.localizedDescription)
+            }
+        }
+        attachProblem = problems.first
+        if !attachments.isEmpty { focused = true }
+    }
+
+    private func loadPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        photoItems = []
+        Task {
+            for item in items {
+                guard attachments.filter(\.isPhoto).count < 4, attachments.count < SmartzFiles.maxAttachments else { break }
+                if let data = try? await item.loadTransferable(type: Data.self), let image = SmartzFiles.picture(data) {
+                    attachments.append(SmartzAttachment(name: "Photo", image: image, file: nil))
+                } else {
+                    attachProblem = "That photo couldn't be opened."
+                }
+            }
+            focused = true
+        }
     }
 
     private func dictate() {
@@ -372,12 +485,12 @@ public struct SmartzChatView<Accessory: View>: View {
                         if !mine, isLast, chats.canRegenerate {
                             Button { chats.regenerate() } label: { Label("Answer Again", systemImage: "arrow.clockwise") }
                         }
-                        if mine, isLastQuestion, chats.answering == nil {
+                        if mine, isLastQuestion, chats.answering == nil, !SmartzChats.hasPhotos(message.text), !SmartzChats.hasFiles(message.text) {
                             Button(action: edit) { Label("Edit", systemImage: "pencil") }
                         }
                     }
                 if mine {
-                    if isLastQuestion, chats.answering == nil, !SmartzChats.hasPhotos(message.text) {
+                    if isLastQuestion, chats.answering == nil, !SmartzChats.hasPhotos(message.text), !SmartzChats.hasFiles(message.text) {
                         Button(action: edit) { Image(systemName: "pencil") }
                             .accessibilityLabel("Edit")
                             .font(.caption).foregroundStyle(.secondary).buttonStyle(.borderless)
@@ -586,41 +699,23 @@ nonisolated public enum SmartzPlans {
     ]
 }
 
+/// The Smartz Subscription in Settings: today's tokens, the plans, buying and managing.
 public struct SmartzSubscriptionView: View {
-    private var usage = SmartzUsage.shared
-
     public init() {}
 
     public var body: some View {
-        Form {
-            Section {
-                SmartzTokensBadge()
-                Text("Smartz tokens pay for Smartz in every Asteria app: Smartz, Post, Browse, Box, Food and Mood, Timeclock, and Swift: Zero to Hero. Your tokens refresh at midnight UTC.")
-                    .font(.callout)
+        ScrollView {
+            VStack(spacing: 16) {
+                Text("Smartz tokens pay for Smartz in every Asteria app (Smartz, Post, Browse, Box, Food and Mood, Timeclock, and Swift: Zero to Hero) and at smartz.chat. Your tokens refresh at midnight UTC, and one plan covers every app.")
+                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                SmartzPlanList()
             }
-            Section {
-                ForEach(SmartzPlans.all) { plan in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(plan.name).font(.headline)
-                            Text("\(plan.tokens) tokens a day").font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if plan.id == usage.tier {
-                            Label("Yours", systemImage: "checkmark.circle.fill").labelStyle(.titleAndIcon).foregroundStyle(.tint).font(.callout.bold())
-                        } else {
-                            Text(plan.price == "Free" ? "Free" : "\(plan.price)/mo").foregroundStyle(.secondary).monospacedDigit()
-                        }
-                    }
-                }
-            } header: {
-                Text("The Smartz Subscription")
-            } footer: {
-                Text("During the beta, every Asteria Account is on Dedicated, free. Plans go on sale soon, and one plan covers every Asteria app.")
-            }
+            .padding(20)
+            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle("The Smartz Subscription")
-        .task { await usage.refresh() }
+        .task { await SmartzUsage.shared.refresh(); await SmartzSubscription.shared.refresh() }
     }
 }
 
@@ -641,7 +736,9 @@ public struct AsteriaAccountSection: View {
             if let username = account.username {
                 LabeledContent("Signed in as", value: "@" + username)
                 SmartzTokensBadge()
-                NavigationLink("The Smartz Subscription") { SmartzSubscriptionView() }
+                NavigationLink { SmartzSubscriptionView() } label: {
+                    LabeledContent("The Smartz Subscription", value: SmartzSubscription.shared.status?.plan?.tierName ?? SmartzUsage.shared.tierName ?? "")
+                }
                 Button("Sign Out") { account.signOut(); onSignOut() }
                 Button("Delete Asteria Account…", role: .destructive) { deleting = true }
             } else {
@@ -651,12 +748,14 @@ public struct AsteriaAccountSection: View {
         } header: {
             Text("Asteria Account")
         } footer: {
+            // The sheets hang off the footer, one view: on the Section, a Form copies them onto every row, which
+            // presented them several times at once and closed the Settings sheet they were in.
             Text(account.isSignedIn
                  ? "Your Asteria Account works in every Asteria app, with the same tokens and chats with Smartz."
                  : "One account for every Asteria app: your Smartz tokens and your chats with Smartz follow you everywhere. It's also your Asteria Post account.")
+                .sheet(item: $sheet) { mode in AsteriaSignInView(mode: mode) }
+                .sheet(isPresented: $deleting) { AsteriaDeleteAccountView { onSignOut() } }
         }
-        .sheet(item: $sheet) { mode in AsteriaSignInView(mode: mode) }
-        .sheet(isPresented: $deleting) { AsteriaDeleteAccountView { onSignOut() } }
     }
 }
 
@@ -676,29 +775,46 @@ public struct AsteriaSignInView: View {
     /// Signed in (or made): the form gives way to a confirmation, and Done closes the sheet. Closing it straight away
     /// collided with the system's "Save Password?" prompt, which left a sheet that wouldn't close.
     @State private var welcomed: String?
+    @State private var offeringPlans = false
 
     public init(mode: Mode = .signIn) { _mode = State(initialValue: mode) }
 
     public var body: some View {
         NavigationStack {
             if let welcomed {
-                VStack(spacing: 14) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 56))
-                        .foregroundStyle(.tint)
-                    Text(mode == .signUp ? "Welcome, @\(welcomed)" : "Signed in as @\(welcomed)")
-                        .font(.title3.bold())
-                    Text("Your Asteria Account works in every Asteria app, with the same Smartz tokens and chats with Smartz.")
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
-                    Button { dismiss() } label: { Text("Done").bold().frame(maxWidth: 280) }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .padding(.top, 6)
+                ScrollView {
+                    VStack(spacing: 14) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 56))
+                            .foregroundStyle(.tint)
+                        Text(mode == .signUp ? "Welcome, @\(welcomed)" : "Signed in as @\(welcomed)")
+                            .font(.title3.bold())
+                        Text("Your Asteria Account works in every Asteria app, with the same Smartz tokens and chats with Smartz.")
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                        if offeringPlans {
+                            // Signing in is when the plans are offered (an account that has one isn't asked).
+                            Text("Get More from Smartz").font(.headline).padding(.top, 10)
+                            SmartzPlanList(onlyUpgrades: true)
+                        }
+                        if offeringPlans {
+                            Button { dismiss() } label: { Text("Not Now").bold().frame(maxWidth: 280) }
+                                .buttonStyle(.bordered).controlSize(.large).padding(.top, 6)
+                        } else {
+                            Button { dismiss() } label: { Text("Done").bold().frame(maxWidth: 280) }
+                                .buttonStyle(.borderedProminent).controlSize(.large).padding(.top, 6)
+                        }
+                    }
+                    .padding(24)
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationTitle(mode == .signIn ? "Asteria Account" : "Make an Asteria Account")
+                .task {
+                    let store = SmartzSubscription.shared
+                    await store.refresh(sendingEntitlements: true)
+                    offeringPlans = store.status?.plan == nil && !store.upgrades.isEmpty
+                }
             } else {
                 form
             }
@@ -798,6 +914,11 @@ public struct AsteriaDeleteAccountView: View {
             Form {
                 Section {
                     Text("This deletes your Asteria Account everywhere: your Asteria Post account and posts, your bots' usernames, your Smartz tokens, your chats with Smartz in every app, and what apps sync through it, like Timeclock's hours. It can't be undone.")
+                    if SmartzUsage.shared.subscribed {
+                        Text("Deleting your account doesn't cancel The Smartz Subscription: the App Store bills it. Cancel it in your App Store subscriptions first.")
+                            .foregroundStyle(.orange)
+                        Link("Manage Subscriptions", destination: SmartzSubscription.manageURL)
+                    }
                     SecureField("Password", text: $password).textContentType(.password)
                 }
                 if let problem { Section { Text(problem).foregroundStyle(.red) } }

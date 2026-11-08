@@ -11,6 +11,7 @@
 // 5.1.2(i) asks of apps that share data with an AI service. An app that never asked can't send anything.
 import Foundation
 import FoundationModels
+import SwiftUI
 import Synchronization
 
 /// Whether Smartz can answer right now, in words a person can act on.
@@ -43,6 +44,7 @@ nonisolated public enum Smartz {
         var privacyURL = URL(string: "https://asteria.technology/privacy/")!
         var credential: (@Sendable () async -> Credential?)?
         var developmentKey: String?
+        var tint: Color?
     }
 
     static let settings = Mutex(Settings())
@@ -69,6 +71,8 @@ nonisolated public enum Smartz {
         // The button on top of the iPhone keyboard that hides it, for every field in the app (SmartzKeyboard.swift).
         Task { @MainActor in SmartzKeyboard.install() }
         #endif
+        // The Smartz Subscription: purchases and renewals as they come (SmartzSubscription.swift).
+        Task { @MainActor in SmartzSubscription.shared.start() }
     }
 
     /// The signed-in account changed (signed in, out, or deleted): start a new session with it, and refresh tokens
@@ -94,6 +98,12 @@ nonisolated public enum Smartz {
     public static let contextSize = 96_000
 
     public static var appName: String { settings.withLock { $0.appName } }
+
+    /// The app's own colour, for what the kit shows outside the app's views (the plans when they're offered).
+    public static var tint: Color? {
+        get { settings.withLock { $0.tint } }
+        set { settings.withLock { $0.tint = newValue } }
+    }
     public static var privacyURL: URL { settings.withLock { $0.privacyURL } }
 
     // MARK: Permission
@@ -163,6 +173,9 @@ public final class SmartzUsage {
     public private(set) var tierName: String?
     public private(set) var resetsAt: Date?
     public private(set) var known = false
+    /// The account holds a plan bought in the App Store, billed through `planApp` (a bundle ID).
+    public private(set) var subscribed = false
+    public private(set) var planApp: String?
 
     public var tokensLeft: Int { max(0, Int((Double(tokensPerDay) - used).rounded(.down))) }
     /// Most of today's tokens are gone (80% or more): time for a heads-up, never a surprise.
@@ -185,6 +198,8 @@ public final class SmartzUsage {
         let tier: String?
         let tierName: String?
         let resetsAt: Date?
+        var subscribed: Bool? = nil
+        var planApp: String? = nil
     }
 
     func apply(_ report: Report) {
@@ -195,6 +210,8 @@ public final class SmartzUsage {
         tierName = report.tierName
         resetsAt = report.resetsAt
         known = report.tokensPerDay != nil
+        subscribed = report.subscribed ?? false
+        planApp = report.planApp
     }
 
     /// Asks the gateway (after the person has turned Smartz on).
