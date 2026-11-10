@@ -34,6 +34,7 @@ public struct SmartzChatView<Accessory: View>: View {
     @State private var attachProblem: String?
     @State private var dropping = false
     @FocusState private var focused: Bool
+    @Bindable private var mode = SmartzModeSetting.shared
 
     private var voice: SmartzVoice { .shared }
     private var usage: SmartzUsage { .shared }
@@ -237,6 +238,12 @@ public struct SmartzChatView<Accessory: View>: View {
             Toggle(isOn: Binding(get: { voice.autoSpeak }, set: { voice.setAutoSpeak($0) })) {
                 Label("Read Answers Aloud", systemImage: "speaker.wave.2")
             }
+            Picker(selection: $mode.mode) {
+                ForEach(Smartz.Mode.allCases) { Label($0.name, systemImage: $0.symbol).tag($0) }
+            } label: {
+                Label("Smartz or SuperSmartz", systemImage: mode.mode.symbol)
+            }
+            .pickerStyle(.inline)
             Toggle(isOn: $chats.thinkHarder) { Label("Think Harder", systemImage: "brain") }
             if chats.agent.learns {
                 Section {
@@ -269,7 +276,7 @@ public struct SmartzChatView<Accessory: View>: View {
             } else {
                 accessory
                 attachMenu
-                TextField("Message \(chats.agent.name)", text: $text, axis: .vertical)
+                TextField("Message \(chats.agent.name == "Smartz" ? mode.mode.name : chats.agent.name)", text: $text, axis: .vertical)
                     .lineLimit(1...6)
                     .focused($focused)
                     .textFieldStyle(.plain)

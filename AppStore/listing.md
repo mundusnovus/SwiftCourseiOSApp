@@ -1,12 +1,13 @@
 # App Store listing — Swift: Zero to Hero 2.0
 
-## 27.2.8: ready to submit (9 November 2026)
+## 27.2.8: ready to submit (10 November 2026)
 
-The version for the App Store, "the Argon update": Smartz now answers with Gemini 4 Argon, by Google, instead of DeepInfra. Everything else in the 27.2.7 section below still applies (description text, in-app purchases, review notes); this section says what changed. Everything below that is from earlier versions.
+The version for the App Store: Smartz now answers with Claude, by Anthropic, instead of DeepInfra, and SuperSmartz (Claude Opus 5.5) is a switch away. Everything else in the 27.2.7 section below still applies (description text, in-app purchases, review notes); this section says what changed. Everything below that is from earlier versions.
 
 ### What's New in 27.2.8
 
-- Smartz now thinks with Gemini 4 Argon, Google's flagship reasoning model: sharper answers, and better with pictures, files and long chats. Smartz asks once before using it.
+- Smartz now thinks with Claude, by Anthropic: sharper answers, and better with pictures, files and long chats. Smartz asks once before using it.
+- SuperSmartz: turn it on for the hardest questions and Smartz answers with Claude Opus 5.5. It uses about twice the Smartz tokens.
 - The Smartz Subscription: more Smartz tokens every day, in every Asteria app and at smartz.chat. It's offered when you sign in, and when you run out for the day.
 - Attach photos and files to your messages to Smartz: PDFs, text, and Word, Excel and PowerPoint documents.
 - Connectors: let Smartz use Notion, Linear, GitHub and dozens more. Set one up once and it works in every Asteria app.
@@ -14,11 +15,11 @@ The version for the App Store, "the Argon update": Smartz now answers with Gemin
 
 ### App Privacy
 
-Smartz's AI provider is now Google (Gemini 4 Argon, through Google's paid Gemini API) instead of DeepInfra. The categories don't change: what Smartz reads to answer is still Data Not Linked to You, used for App Functionality, not for tracking. Google doesn't train on it; it keeps it for up to 55 days only to detect abuse. Keep the 27.2.7 additions (Purchases › Purchase History).
+Smartz's AI provider is now Anthropic (Claude Sonnet 5.5, and Claude Opus 5.5 for SuperSmartz) instead of DeepInfra. The categories don't change: what Smartz reads to answer is still Data Not Linked to You, used for App Functionality, not for tracking. Anthropic doesn't train on it and deletes it within 30 days, unless its safety systems flag it. Keep the 27.2.7 additions (Purchases › Purchase History).
 
 ### Review notes
 
-Add: "Smartz's answers come from Google's Gemini API (Gemini 4 Argon), with the developer's key, through the developer's gateway. The consent sheet and the privacy policy name Google; people who agreed to the previous provider are asked again before anything is sent."
+Add: "Smartz's answers come from Anthropic's Claude API (Claude Sonnet 5.5, or Claude Opus 5.5 when the person turns on SuperSmartz), with the developer's key, through the developer's gateway. The consent sheet and the privacy policy name Anthropic; people who agreed to the previous provider are asked again before anything is sent."
 
 ## 27.2.7: uploaded 8 November 2026, replaced by 27.2.8
 

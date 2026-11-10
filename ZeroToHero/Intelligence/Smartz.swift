@@ -1,7 +1,8 @@
 // Smartz: Asteria Technology's AI, the same in every Asteria app. It is a FoundationModels language model
 // (SmartzModel), so apps use it exactly like Apple's: LanguageModelSession, tools, @Generable answers,
-// streaming. Requests go to Asteria's gateway at asteria.technology/intelligence, which holds Google's key and asks
-// Gemini 4 Argon (since 27.2.8; DeepInfra before). Voice is ElevenLabs, through the same gateway (SmartzVoice.swift).
+// streaming. Requests go to Asteria's gateway at asteria.technology/intelligence, which holds Anthropic's key and asks
+// Claude (since 27.2.8; DeepInfra before): Claude Sonnet 5.5 for Smartz, Claude Opus 5.5 for SuperSmartz
+// (`Smartz.mode`). Voice is ElevenLabs, through the same gateway (SmartzVoice.swift).
 //
 // The shared files are Smartz*.swift in Asteria Search (SmartzAccount.swift is the Asteria Account). Smartz, Post, Food and Mood, Box and
 // Swift: Zero to Hero keep copies
@@ -9,7 +10,7 @@
 //
 // Before anything is sent, the person says yes once (SmartzPermission.swift), as App Review guideline
 // 5.1.2(i) asks of apps that share data with an AI service. An app that never asked can't send anything. A yes is for
-// the provider it named: one given before Google answered is asked for again, once.
+// the provider it named: one given before Anthropic answered is asked for again, once.
 import Foundation
 import FoundationModels
 import SwiftUI
@@ -115,7 +116,7 @@ nonisolated public enum Smartz {
     /// Who answers, as the consent sheet names them; a yes is kept with it. A yes given for someone else (DeepInfra,
     /// before 27.2.8, kept nothing here) counts as not asked, so the sheet comes back once and says what changed.
     static let providerKey = "AsteriaIntelligence.permissionProvider"
-    static let provider = "google"
+    static let provider = "anthropic"
 
     public static var permission: Permission {
         get {
@@ -132,7 +133,7 @@ nonisolated public enum Smartz {
         UserDefaults.standard.string(forKey: permissionKey).flatMap(Permission.init(rawValue:)) ?? .notAsked
     }
 
-    /// Said yes before Smartz moved to Google, and not asked since: the sheet says what changed.
+    /// Said yes before Smartz moved to Anthropic, and not asked since: the sheet says what changed.
     public static var permissionIsRenewal: Bool {
         storedPermission == .granted && UserDefaults.standard.string(forKey: providerKey) != provider
     }
@@ -150,6 +151,24 @@ nonisolated public enum Smartz {
 
     /// Features can show their button whenever this is true: the first use asks for permission.
     public static var canOffer: Bool { permission != .declined }
+
+    // MARK: Smartz and SuperSmartz
+
+    /// Smartz answers with Claude Sonnet 5.5; SuperSmartz with Claude Opus 5.5, for the hardest questions (it costs
+    /// about twice as many Smartz tokens). The choice is the app's, and every request from it follows it.
+    public enum Mode: String, Sendable, CaseIterable, Identifiable {
+        case smartz, `super`
+        public var id: String { rawValue }
+        public var name: String { self == .super ? "SuperSmartz" : "Smartz" }
+        public var symbol: String { self == .super ? "sparkles.2" : "sparkles" }
+    }
+
+    static let modeKey = "Smartz.mode"
+
+    /// The mode requests use now (SmartzModeSetting changes it, for views).
+    public static var mode: Mode {
+        UserDefaults.standard.string(forKey: modeKey).flatMap(Mode.init(rawValue:)) ?? .smartz
+    }
 
     // MARK: Words
 

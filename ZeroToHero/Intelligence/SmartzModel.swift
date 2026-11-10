@@ -116,7 +116,7 @@ nonisolated enum IntelligenceRequest {
             let rule = "Answer with one JSON object and nothing else: no Markdown, no code fence, no commentary. It must follow this JSON schema:\n\(json)"
             messages.append(["role": "system", "content": rule])
         }
-        var body: [String: Any] = ["messages": messages]
+        var body: [String: Any] = ["messages": messages, "smartz_mode": Smartz.mode.rawValue]
         let options = request.generationOptions
         let toolsAllowed = options.toolCallingMode?.kind != .disallowed
         if !request.enabledToolDefinitions.isEmpty {
