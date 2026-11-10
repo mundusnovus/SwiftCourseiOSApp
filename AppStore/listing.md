@@ -1,8 +1,28 @@
 # App Store listing — Swift: Zero to Hero 2.0
 
-## 27.2.7: ready to submit (8 November 2026)
+## 27.2.8: ready to submit (9 November 2026)
 
-The version for the App Store. Everything below this section is from earlier versions.
+The version for the App Store, "the Argon update": Smartz now answers with Gemini 4 Argon, by Google, instead of DeepInfra. Everything else in the 27.2.7 section below still applies (description text, in-app purchases, review notes); this section says what changed. Everything below that is from earlier versions.
+
+### What's New in 27.2.8
+
+- Smartz now thinks with Gemini 4 Argon, Google's flagship reasoning model: sharper answers, and better with pictures, files and long chats. Smartz asks once before using it.
+- The Smartz Subscription: more Smartz tokens every day, in every Asteria app and at smartz.chat. It's offered when you sign in, and when you run out for the day.
+- Attach photos and files to your messages to Smartz: PDFs, text, and Word, Excel and PowerPoint documents.
+- Connectors: let Smartz use Notion, Linear, GitHub and dozens more. Set one up once and it works in every Asteria app.
+- A button to hide the keyboard while you type, on iPhone.
+
+### App Privacy
+
+Smartz's AI provider is now Google (Gemini 4 Argon, through Google's paid Gemini API) instead of DeepInfra. The categories don't change: what Smartz reads to answer is still Data Not Linked to You, used for App Functionality, not for tracking. Google doesn't train on it; it keeps it for up to 55 days only to detect abuse. Keep the 27.2.7 additions (Purchases › Purchase History).
+
+### Review notes
+
+Add: "Smartz's answers come from Google's Gemini API (Gemini 4 Argon), with the developer's key, through the developer's gateway. The consent sheet and the privacy policy name Google; people who agreed to the previous provider are asked again before anything is sent."
+
+## 27.2.7: uploaded 8 November 2026, replaced by 27.2.8
+
+Uploaded on 8 November; 27.2.8 replaces it for submission. Its description text, in-app purchases, App Privacy and review notes still apply, with the changes in the 27.2.8 section.
 
 ### What's New in 27.2.7
 

@@ -93,6 +93,8 @@ struct SmartzPermissionHost: ViewModifier {
 /// What Smartz is and where requests go, with Turn On and Not Now.
 public struct SmartzConsentView: View {
     @Environment(\.openURL) private var openURL
+    /// Said yes before Smartz moved to Google (read once, so the note doesn't vanish while the sheet is up).
+    @State private var renewal = Smartz.permissionIsRenewal
 
     public init() {}
 
@@ -110,12 +112,19 @@ public struct SmartzConsentView: View {
                         Text("Smartz by Asteria, built into \(Smartz.appName).")
                             .font(.title3)
                             .foregroundStyle(.secondary)
+                        if renewal {
+                            Text("Smartz now thinks with Gemini 4 Argon, Google's AI model. Here's where what you send goes now; turn Smartz on again to keep using it.")
+                                .font(.callout)
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
                     }
                     .padding(.top, 36)
                     Row(symbol: "arrow.up.message",
-                        text: "When you use it, what you ask and anything you share with it, like a page, a chat or a photo, goes to Asteria and is answered by our AI provider, DeepInfra, in the United States. With voice, what you say and what Smartz says go to ElevenLabs.")
+                        text: "When you use it, what you ask and anything you share with it, like a page, a chat, a file or a photo, goes to Asteria and is answered by Gemini 4 Argon, Google's AI model. With voice, what you say and what Smartz says go to ElevenLabs.")
                     Row(symbol: "hand.raised",
-                        text: "DeepInfra keeps nothing you send, and ElevenLabs handles voice under its own privacy policy. Asteria keeps your chats only when you sign in, sealed, so they follow you; what Smartz learns about you stays private unless you choose to share it.")
+                        text: "Google doesn't use what you send to train its models, and keeps it for up to 55 days only to check for abuse. ElevenLabs handles voice under its own privacy policy. Asteria keeps your chats only when you sign in, sealed, so they follow you; what Smartz learns about you stays private unless you choose to share it.")
                     Row(symbol: "switch.2", text: "You can turn Smartz off at any time in Settings.")
                     Button("Privacy Policy") { openURL(Smartz.privacyURL) }
                         .font(.callout)
@@ -170,7 +179,7 @@ public struct SmartzSettingsSection: View {
             }
             Link("Privacy Policy", destination: Smartz.privacyURL)
         } footer: {
-            Text("Answers come from a large AI model run by our AI provider, DeepInfra, in the United States, which keeps nothing you send. Voice is by ElevenLabs, under its own privacy policy.")
+            Text("Answers come from Gemini 4 Argon, Google's AI model. Google doesn't use what you send to train its models, and keeps it for up to 55 days only to check for abuse. Voice is by ElevenLabs, under its own privacy policy.")
         }
     }
 }

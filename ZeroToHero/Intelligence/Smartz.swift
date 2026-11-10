@@ -1,14 +1,15 @@
 // Smartz: Asteria Technology's AI, the same in every Asteria app. It is a FoundationModels language model
 // (SmartzModel), so apps use it exactly like Apple's: LanguageModelSession, tools, @Generable answers,
-// streaming. Requests go to Asteria's gateway at asteria.technology/intelligence, which holds the model provider's key
-// (DeepInfra, in the US). Voice is ElevenLabs, through the same gateway (SmartzVoice.swift).
+// streaming. Requests go to Asteria's gateway at asteria.technology/intelligence, which holds Google's key and asks
+// Gemini 4 Argon (since 27.2.8; DeepInfra before). Voice is ElevenLabs, through the same gateway (SmartzVoice.swift).
 //
 // The shared files are Smartz*.swift in Asteria Search (SmartzAccount.swift is the Asteria Account). Smartz, Post, Food and Mood, Box and
 // Swift: Zero to Hero keep copies
 // (their tools/sync-intelligence.sh); Browse uses the package.
 //
 // Before anything is sent, the person says yes once (SmartzPermission.swift), as App Review guideline
-// 5.1.2(i) asks of apps that share data with an AI service. An app that never asked can't send anything.
+// 5.1.2(i) asks of apps that share data with an AI service. An app that never asked can't send anything. A yes is for
+// the provider it named: one given before Google answered is asked for again, once.
 import Foundation
 import FoundationModels
 import SwiftUI
@@ -111,10 +112,29 @@ nonisolated public enum Smartz {
     public enum Permission: String, Sendable { case notAsked, granted, declined }
 
     static let permissionKey = "AsteriaIntelligence.permission"
+    /// Who answers, as the consent sheet names them; a yes is kept with it. A yes given for someone else (DeepInfra,
+    /// before 27.2.8, kept nothing here) counts as not asked, so the sheet comes back once and says what changed.
+    static let providerKey = "AsteriaIntelligence.permissionProvider"
+    static let provider = "google"
 
     public static var permission: Permission {
-        get { UserDefaults.standard.string(forKey: permissionKey).flatMap(Permission.init(rawValue:)) ?? .notAsked }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: permissionKey) }
+        get {
+            let stored = storedPermission
+            return stored == .granted && UserDefaults.standard.string(forKey: providerKey) != provider ? .notAsked : stored
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: permissionKey)
+            UserDefaults.standard.set(provider, forKey: providerKey)
+        }
+    }
+
+    private static var storedPermission: Permission {
+        UserDefaults.standard.string(forKey: permissionKey).flatMap(Permission.init(rawValue:)) ?? .notAsked
+    }
+
+    /// Said yes before Smartz moved to Google, and not asked since: the sheet says what changed.
+    public static var permissionIsRenewal: Bool {
+        storedPermission == .granted && UserDefaults.standard.string(forKey: providerKey) != provider
     }
 
     /// The person said yes and hasn't turned it off.
